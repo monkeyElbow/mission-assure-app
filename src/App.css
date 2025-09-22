@@ -1,0 +1,221 @@
+@import url("https://use.typekit.net/nmy3epc.css");
+
+
+:root {
+  --agf1:#00ADBB;
+  --agf2:#008AAB;
+  --mango:#FFA400;
+  --melon:#f26660;
+  --gray:#76787B;
+  --dark:#414042;
+  --sand:#C4BEB6;
+
+/* 
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center; */
+}
+
+footer #text,
+footer #brandfont{
+  fill:white;
+}
+
+footer #brandfont:hover{
+  fill: var(--sand);
+}
+
+html, body, #root { 
+  height: 100%; 
+  margin:0;
+  display: flex;
+  flex-direction:column;
+}
+
+.test {
+  background-color: fuchsia;
+  fill: fuchsia;
+
+}
+
+
+
+body{font-family:"Helvetica Neue",system-ui,sans-serif;color:var(--agf-text);background:var(--agf-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;}
+
+h1,h2{
+  font-family: "avenir-next-world", "Helvetica Neue", sans-serif;
+  font-weight: 700 !important;
+  font-style: normal;
+  letter-spacing: -1px !important;
+  font-size: 3em;
+  color: var(--agf1) !important;
+}
+p {
+  font-family: "helvetica-neue-world", sans-serif;
+  font-weight: 400;
+  font-style: normal;
+}
+
+a {
+  text-decoration: none;
+  color: var(--agf1);
+}
+footer a:hover {
+  text-decoration: underline;
+}
+footer a {
+color: white;}
+footer a:hover {
+  color: var(--sand);
+
+}
+
+
+/* AGF buttons */
+.btn-primary {
+  background: var(--agf2);
+  border-color: var(--agf2);
+}
+.btn-primary:hover {
+  background: var(--agf1);
+  border-color: var(--agf1);
+}
+.btn-primary:active {
+  background: var(--dark) !important;
+  border-color: var(--dark);
+}
+
+.btn:disabled{
+  background-color: var(--sand);
+  border-color: var(--sand);
+}
+
+
+.btn-outline-primary {
+  color: var(--agf2);
+  border-color: var(--agf2);
+}
+.btn-outline-primary:hover {
+  color: white;
+  border-color: var(--melon);
+  background-color: var(--melon);
+}
+
+/* Navbar colors (so links aren’t faint) */
+/* .navbar {
+  --bs-navbar-color: #3B4450;
+  --bs-navbar-hover-color: #0B0E11;
+} */
+
+.bg-afgi1, .bg-agf1 {
+  fill:var(--agf1);
+  background-color: var(--agf1);
+}
+.bg-afgi1:hover {
+  fill:var(--agf2);
+  background-color: var(--agf2);
+}
+.bg-agf2 {
+  background-color: var(--agf2);
+}
+
+.bg-dark {
+  background-color: var(--dark);
+  fill: var(--dark);
+}
+
+.mango{
+  color: var(--mango);
+}
+.bg-mango{
+  background-color: var(--mango);
+}
+.bg-melon{
+  background-color: var(--melon);
+}
+.bg-sand{
+  background-color: var(--sand);
+}
+.sand{
+  color: var(--sand);
+}
+
+
+.card {
+  transition: 2s ease;
+}
+.card:hover{
+  background: #f3f1ef;
+}
+
+/* app logo */
+.brand-logo svg { height: 60px; display: block; }
+.brand-logo { line-height: 0; }
+
+
+/* AGFI logo */
+
+.agfi-logo { display:block;
+  position: relative;
+  right:-20px;
+
+}
+
+.agfi-logo .bg-agf1 {
+  fill: var(--agf1);
+  transition: fill 0.25s ease;
+}
+.agfi-logo .bg-dark {
+  fill: var(--dark);
+  transition: fill 0.25s ease;
+  will-change: transform;
+
+}
+
+/* hover via Link wrapper */
+.agfi-logo-link:hover .agfi-logo .bg-agf1 { fill: var(--agf2); }
+
+
+
+
+
+/* LOGO ANIMATION */
+/* base */
+.brand-logo #shackle{
+  transition: transform 220ms ease-out;
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform;
+}
+
+/* hover lift */
+.brand-logo:hover #shackle{
+  transform: translateY(-11px);
+}
+
+/* during click, disable hover effect */
+.brand-logo.no-hover:hover #shackle{
+  transform: translateY(0);
+}
+
+/* click slam down fast */
+.brand-logo.clicked #shackle{
+  /* immediate slam down */
+  transition: transform 90ms cubic-bezier(.3,.7,.4,1);
+  transform: translateY(20px) !important;
+}
+
+/* when .clicked is later removed by JS, it eases back to origin
+   via the base transition above (220ms ease-out). */
+
+
+/* logo intro anim */
+   .intro-area svg #text,
+.intro-area svg #assure,
+.intro-area svg #shackle {
+  will-change: transform, opacity;
+}
+.intro-area h1.mango { color: #F5A623 !important; }
