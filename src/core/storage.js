@@ -1,8 +1,45 @@
 const NS = 'missionassure.v1';
+const hasLocalStorage = typeof localStorage !== 'undefined';
+const memory = new Map();
 
 function key(name){ return `${NS}.${name}`; }
-function read(name){ try { return JSON.parse(localStorage.getItem(key(name))||'[]'); } catch { return []; } }
-function write(name, rows){ localStorage.setItem(key(name), JSON.stringify(rows)); }
+
+function storageGet(name){
+  if (hasLocalStorage) return localStorage.getItem(key(name));
+  return memory.get(name) ?? null;
+}
+
+function storageSet(name, value){
+  if (hasLocalStorage) localStorage.setItem(key(name), value);
+  else memory.set(name, value);
+}
+
+function storageRemove(name){
+  if (hasLocalStorage) localStorage.removeItem(key(name));
+  else memory.delete(name);
+}
+
+function storageKeys(){
+  if (hasLocalStorage) {
+    const keys = [];
+    for (let i=0; i<localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.startsWith(NS + '.')) keys.push(k);
+    }
+    return keys;
+  }
+  return Array.from(memory.keys()).map(k => `${NS}.${k}`);
+}
+
+function read(name){
+  const raw = storageGet(name);
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
+}
+
+function write(name, rows){
+  storageSet(name, JSON.stringify(rows));
+}
 
 export const store = {
   all: read,
@@ -19,4 +56,13 @@ export const store = {
   },
   where(name, pred){ return read(name).filter(pred); },
   remove(name, id){ write(name, read(name).filter(r => r.id !== id)); },
+  clearAll(){
+    if (hasLocalStorage) {
+      for (const k of storageKeys()){
+        localStorage.removeItem(k);
+      }
+    } else {
+      memory.clear();
+    }
+  }
 };

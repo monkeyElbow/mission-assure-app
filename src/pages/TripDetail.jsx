@@ -266,8 +266,8 @@ function startEdit() {
     ? (guardianOk ? 'Guardian OK' : 'Guardian needed')
     : (confirmedOk ? 'Confirmed' : 'Needs confirm');
   const statusBadgeClass = (isMinorLocal ? guardianOk : confirmedOk)
-    ? 'text-bg-success'
-    : 'text-bg-warning';
+    ? 'bg-agf2 text-white'
+    : 'bg-melon';
   const statusTip = isMinorLocal
     ? (guardianOk ? 'Click to revoke guardian approval' : 'Click to simulate guardian approval')
     : (confirmedOk ? 'Click to mark unconfirmed' : 'Click to confirm traveler');
@@ -377,8 +377,8 @@ function startEdit() {
                 >
                   {statusLabel}
                 </span>
-                {status === 'ready'   && <span className="badge text-bg-primary">Covered</span>}
-                {status === 'pending' && <span className="badge text-bg-warning">Pending</span>}
+                {status === 'ready'   && <span className="badge bg-agf1 text-white">Covered</span>}
+                {status === 'pending' && <span className="badge bg-melon">Pending</span>}
               </div>
               <div className="small text-muted mt-1">
                 {email || '—'}{(email && phone) ? ' • ' : ''}{phone || ''}
@@ -482,7 +482,7 @@ function startEdit() {
       >
         Mark Approved (demo)
       </button>
-      <span className={`badge ${draft.guardianApproved ? 'text-bg-success' : 'text-bg-warning'}`}>
+      <span className={`badge ${draft.guardianApproved ? 'bg-agf2 text-white' : 'bg-melon'}`}>
         {draft.guardianApproved ? 'Guardian OK' : 'Awaiting approval'}
       </span>
     </div>
@@ -758,12 +758,20 @@ async function load(showSpinner = true){
 
   useEffect(()=>{ load() }, [id])
 
+  const members = useMemo(
+    () => Array.isArray(trip?.members) ? trip.members : [],
+    [trip?.members]
+  );
+  const confirmedCount = useMemo(
+    () => members.filter(isEligibleMember).length,
+    [members]
+  );
+
   // --- Payment summary (derived from current snapshot on the trip) ---
-  const headcount = trip?.members?.length || 0
   const days = useMemo(()=> trip ? daysBetween(trip.startDate, trip.endDate) : 0,
                        [trip?.startDate, trip?.endDate])
-  const subtotal = useMemo(()=> days * headcount * (trip?.rateCents || 0),
-                           [days, headcount, trip?.rateCents])
+  const subtotal = useMemo(()=> days * confirmedCount * (trip?.rateCents || 0),
+                           [days, confirmedCount, trip?.rateCents])
   // If you have credits in local storage, swap this for your real calculator:
   const credit = trip?.creditsTotalCents || 0
   const balanceDue = Math.max(0, subtotal - credit)
@@ -980,6 +988,10 @@ async function loadRoster(explicitTrip) {
       if (expectedSeats > currentSeats) {
         await api.applyPayment(targetTrip.id, 0, { autoAllocate: false });
         sum = await api.getRosterSummary(targetTrip.id);
+      } else if (expectedSeats < currentSeats) {
+        if (typeof api.syncCoverageInventory === 'function') {
+          sum = await api.syncCoverageInventory(targetTrip.id);
+        }
       }
     }
 
@@ -1055,11 +1067,14 @@ async function ensureCoverageForMember(memberId) {
     await api.allocateCoverage(trip.id, coverageId);
   } catch (err) {
     console.error('Unable to auto-allocate coverage', err);
-    const message = err?.message?.includes('No unassigned seats')
-      ? 'No open seats available. Add payment to create another seat or remove someone first.'
-      : err?.message || 'Unable to allocate coverage.';
+    const isSeatUnavailable = err?.message?.includes('No unassigned seats');
     await refreshMembers();
     refreshedInCatch = true;
+    if (isSeatUnavailable) {
+      // Expected path when traveler is confirmed before seats are purchased.
+      return;
+    }
+    const message = err?.message || 'Unable to allocate coverage.';
     setRosterError(message);
     return;
   } finally {
@@ -1207,11 +1222,6 @@ async function handleRelease(memberSummary) {
   if (loading) return <div className="container py-4">Loading trip…</div>
   if (!trip) return <div className="container py-4">Trip not found.</div>
 
-
-
-  const members = Array.isArray(trip?.members) ? trip.members : [];
-  const confirmedCount = members.filter(m => (m.isMinor ? m.guardianApproved : m.confirmed)).length;
-  const legacyPendingCount = members.length - confirmedCount;
     
 
  // ---- Receipt helpers ----
@@ -1437,7 +1447,7 @@ function onEditMember(memberId) {
             {!editingTrip ? (
               <>
                 <div className="d-flex flex-wrap align-items-center gap-2">
-                  <h2 className="h4 mb-0">{trip.title}</h2>
+                  <h2 className="h2 mb-0">{trip.title}</h2>
                   {isArchived && <span className="badge text-bg-secondary">Archived</span>}
               </div>
               <div className="text-muted mt-1">
@@ -1559,7 +1569,7 @@ function onEditMember(memberId) {
       <div className="col-lg-4">
           {/* Payment Summary Card */}
           <div className="card">
-            <div className="card-header fw-bold">Payment summary</div>
+            <div className="card-header bg-agf1 text-white fw-bold">Payment summary</div>
             <div className="card-body">
               {balanceAlert && (
                 <div className="alert alert-warning py-2 px-3 small mb-3">
@@ -1574,93 +1584,65 @@ function onEditMember(memberId) {
                 <span className="text-muted">Days</span>
                 <strong>{days}</strong>
               </div>
-              <div className="d-flex justify-content-between">
+              <div className="d-flex justify-content-between mb-2">
                 <span className="text-muted">Rate</span>
                 <strong>{cents(trip.rateCents || 0)} / person / day</strong>
               </div>
-
-
-{ balanceDue === 0 && headcount > 0 ? (
-  <>
-  {/* PAID UP */}
-  <div className="my-0">
-    <p className="fw-bold">
-      Balance is paid right now. Keep an eye on changes—adding travelers or editing dates can reopen a balance.
-    </p>
-    <button
-      type="button"
-      className="btn btn-outline-secondary w-100 mt-2"
-      onClick={() => {
-        const snap = buildReceiptSnapshot(trip);
-        openReceiptPrintWindow(snap);
-      }}
-    >
-      Print receipt
-    </button>
-  </div>
-  </>
-) : (
-  <>
-
-              <hr/>
-              <div className="d-flex justify-content-between">
-                <span>Subtotal</span>
-                <strong>{cents(subtotal)}</strong>
-              </div>
-              <div className="d-flex justify-content-between">
-                <span>Trip Credits</span>
-                <strong>- {cents(credit)}</strong>
-              </div>
-              <hr/>
-              </>
+              {balanceDue === 0 && confirmedCount > 0 ? (
+                <div className="mt-3">
+                  <p className="fw-bold agf1 mb-3">
+                    Balance is paid right now. Keep an eye on changes—adding travelers or editing dates can reopen a balance.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary w-100"
+                    onClick={() => {
+                      const snap = buildReceiptSnapshot(trip);
+                      openReceiptPrintWindow(snap);
+                    }}
+                  >
+                    Print receipt
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <hr />
+                  <div className="d-flex justify-content-between">
+                    <span>Subtotal</span>
+                    <strong>{cents(subtotal)}</strong>
+                  </div>
+                  <div className="d-flex justify-content-between">
+                    <span>Trip Credits</span>
+                    <strong>- {cents(credit)}</strong>
+                  </div>
+                  <hr />
+                </>
               )}
 
-{/* show REFUND */}
-{refundDue > 0 && (
-  <>
-    {/* <div className="d-flex justify-content-between">
-      <span className="text-success">Refund due</span>
-      <strong className="text-success">{cents(refundDue)}</strong>
-    </div> */}
-    <button
-      className="btn btn-outline-success w-100 mt-3"
-      disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
-      onClick={refundAllCredits}
-    >
-      Request refund {cents(refundDue)}
-    </button>
-    <p className='small text-center'>
-      Refunds can be initiated after the first date of the trip
-    </p>
-  </>
-)}
-
-{/* show PAY button */}
-{balanceDue > 0 && (
- <>
-   <div className="d-flex justify-content-between">
+              {balanceDue > 0 && (
+                <>
+                  <div className="d-flex justify-content-between">
                     <span className="text-danger">Balance due</span>
                     <strong className="text-danger">{cents(balanceDue)}</strong>
                   </div>
-                 
                   <button
-  className="btn btn-primary btn-pay w-100 mt-2"
-  disabled={confirmedCount === 0 || balanceDue === 0 || paying}
-  onClick={payBalance}
->
-  {paying ? 'Paying…' : `Pay ${cents(balanceDue)}`}
-</button>
- </>
-)}
-
-
-
+                    className="btn btn-primary w-100 mt-2"
+                    disabled={confirmedCount === 0 || balanceDue === 0 || paying}
+                    onClick={payBalance}
+                  >
+                    {paying ? 'Paying…' : `Pay ${cents(balanceDue)}`}
+                  </button>
+                  <p className="small text-muted text-center mt-2 mb-0">
+                    Payments cover confirmed travelers only.
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
           {/* Claims Card */}
           <div className="card mt-3">
-            <div className="card-header fw-bold">Claims</div>
+            <div className="card-header fw-bold bg-dark text-white">Claims</div>
             <div className="card-body">
               <button
                 className={`btn ${canClaim ? 'btn-outline-primary' : 'btn-outline-secondary'} w-100`}
@@ -1738,6 +1720,26 @@ function onEditMember(memberId) {
                   members={claimMembers}
                 />
               )}
+            </div>
+          </div>
+
+          {/* Refunds Card */}
+          <div className="card mt-3">
+            <div className="card-header fw-bold bg-dark text-white">Refunds</div>
+            <div className="card-body">
+              <p className="small text-muted mb-3">
+                Refunds return unused trip credits after the itinerary has started. Use this if a covered traveler can no longer go.
+              </p>
+              <button
+                className="btn btn-outline-success w-100"
+                disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
+                onClick={refundAllCredits}
+              >
+                {refunding ? 'Processing…' : `Request refund ${cents(refundDue)}`}
+              </button>
+              <p className="small text-center mt-2 mb-0">
+                Refunds can be initiated after the first date of the trip.
+              </p>
             </div>
           </div>
         </div>

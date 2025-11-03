@@ -56,13 +56,13 @@ export default function MemberRow({ member, onUpdate, onRemove }){
         <div className="fw-semibold">{member.firstName} {member.lastName}</div>
         <div className="text-muted small">{member.email}</div>
         <div className="ms-auto d-flex gap-2">
-          <span className={`badge ${member.status?.confirmed ? 'bg-success' : 'bg-warning text-dark'}`}
+          <span className={`badge ${member.status?.confirmed ? 'bg-agf2 text-white' : 'bg-melon'}`}
                 role="button"
                 onClick={()=> setShowConfirm(true)}>
             {member.status?.confirmed ? 'Confirmed' : 'Not Confirmed'}
           </span>
           {member.type==='MINOR' && (
-            <span className={`badge ${member.status?.guardianApproved ? 'bg-success' : 'bg-warning text-dark'}`}
+            <span className={`badge ${member.status?.guardianApproved ? 'bg-agf2 text-white' : 'bg-mango'}`}
                   role="button"
                   onClick={()=> setShowGuardian(true)}>
               {member.status?.guardianApproved ? 'Guardian Approved' : 'Guardian Needed'}

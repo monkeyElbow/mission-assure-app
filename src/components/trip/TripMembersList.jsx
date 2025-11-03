@@ -50,7 +50,7 @@ export default function TripMembersList({
       )}
 
       <div className="card">
-        <div className="card-header fw-semibold">Spot Overview</div>
+        <div className="card-header fw-semibold bg-agf1 text-white">Spot Overview</div>
         <div className="card-body pb-2">
           <div
             className="d-grid"
@@ -149,31 +149,26 @@ export default function TripMembersList({
                 style={{ width: 14, height: 14, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6' }}
               />
             ))}
-            {!spotAddOpen && (
-              <button
-                type="button"
-                className="btn btn-outline-secondary p-0 d-flex justify-content-center align-items-center"
-                style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: '50%',
-                  fontWeight: 'bold',
-                  lineHeight: 1,
-                  transform: 'translateY(-2px)'
-                }}
-                onClick={() => onSpotAddToggle(true)}
-                aria-label="Add person"
-              >
-                <span style={{ transform: 'translateY(-2px)', display: 'inline-block' }}>+</span>
-              </button>
-            )}
           </div>
+
+          {!spotAddOpen && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm mt-3 d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
+              style={{ borderRadius: 6, letterSpacing: '0.05em' }}
+              onClick={() => onSpotAddToggle(true)}
+              aria-label="Add person"
+            >
+              <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
+              <span>Add person</span>
+            </button>
+          )}
 
         </div>
         <div className="card-footer bg-transparent border-0 pt-0">
           <div className="d-flex flex-wrap align-items-center gap-2 small text-muted">
             <span className="d-inline-flex align-items-center gap-1">
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#00ADBB', display: 'inline-block' }}></span>
+              <span className="bg-agf1" style={{ width: 12, height: 12, borderRadius: 3, display: 'inline-block' }}></span>
               Covered
             </span>
             <span className="d-inline-flex align-items-center gap-1">
@@ -226,12 +221,12 @@ export default function TripMembersList({
       </div>
 
       <div className="card">
-        <div className="card-header d-flex justify-content-between align-items-start">
+        <div className="card-header d-flex justify-content-between align-items-start bg-agf2 text-white">
           <div className="d-flex flex-column">
-            <div className="fw-semibold">Ready Roster</div>
-            <div className="text-muted small">Persons covered and ready to go</div>
+            <div className="fw-semibold h5">Ready Roster</div>
+            <div className="small text-white">Persons covered and ready to go</div>
           </div>
-          <span className="badge" style={{ background: '#00ADBB', color: '#fff' }}>{coveredCount}</span>
+          <span className="badge bg-agf1 text-white">{coveredCount}</span>
         </div>
         <div className="card-body p-0">
           {ready.length === 0 ? (
@@ -243,12 +238,12 @@ export default function TripMembersList({
       </div>
 
       <div className="card">
-        <div className="card-header d-flex justify-content-between align-items-start">
+        <div className="card-header d-flex justify-content-between align-items-start bg-mango">
           <div className="d-flex flex-column">
-            <div className="fw-semibold">Pending Coverage</div>
-            <div className="text-muted small">Move your confirmed travelers up</div>
+            <div className="fw-semibold h5">Pending Coverage</div>
+            <div className="text-muted small">Travelers are moved to ready once confirmed</div>
           </div>
-          <span className="badge text-bg-warning">{pendingCount}</span>
+          <span className="badge bg-dark">{pendingCount}</span>
         </div>
         <div className="card-body p-0">
           {pending.length === 0 ? (

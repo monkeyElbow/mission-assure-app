@@ -90,7 +90,7 @@ function TripCard({ t, meta = {} }) {
             {status === 'DUE' && (
               <motion.span
               key="due"
-              className="badge bg-warning text-dark"
+              className="badge bg-melon text-dark"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}

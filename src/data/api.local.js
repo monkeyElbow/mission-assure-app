@@ -56,9 +56,25 @@ function eventHash(prevHash, eventObj){
   return ('00000000' + h.toString(16)).slice(-8);
 }
 
-function appendEvent({ actorId='LEAD_LOCAL', actorRole='LEADER', trip, type, memberId=null, fromMemberId=null, toMemberId=null, amountCents=null, notes=null }){
+function appendEvent({
+  actorId='LEAD_LOCAL',
+  actorRole='LEADER',
+  trip,
+  type,
+  memberId=null,
+  fromMemberId=null,
+  toMemberId=null,
+  amountCents=null,
+  notes=null,
+  creditsBeforeCents=null,
+  creditsAfterCents=null,
+  spotPriceCents=null
+}){
   const events = store.all(T_EVENTS);
   const prev_hash = events.length ? events[events.length-1].hash : '0'.repeat(8);
+  const spotPrice = spotPriceCents != null ? spotPriceCents : (trip.spot_price_cents || computeSpotPriceCents(trip));
+  const creditsBefore = creditsBeforeCents != null ? creditsBeforeCents : (trip.creditsTotalCents ?? 0);
+  const creditsAfter = creditsAfterCents != null ? creditsAfterCents : (trip.creditsTotalCents ?? 0);
   const e = {
     event_id: ulid(),
     timestamp: isoNow(),
@@ -71,9 +87,9 @@ function appendEvent({ actorId='LEAD_LOCAL', actorRole='LEADER', trip, type, mem
     from_member_id: fromMemberId,
     to_member_id: toMemberId,
     amount_cents: amountCents,
-    spot_price_cents: trip.spot_price_cents || computeSpotPriceCents(trip),
-    credits_before_cents: trip.creditsTotalCents || 0,
-    credits_after_cents: trip.creditsTotalCents || 0,
+    spot_price_cents: spotPrice,
+    credits_before_cents: creditsBefore,
+    credits_after_cents: creditsAfter,
     notes,
     prev_hash,
     hash: 'PENDING'
@@ -81,6 +97,132 @@ function appendEvent({ actorId='LEAD_LOCAL', actorRole='LEADER', trip, type, mem
   e.hash = eventHash(prev_hash, e);
   store.add(T_EVENTS, e);
   return e;
+}
+
+function memberPrimaryId(member) {
+  if (!member) return null;
+  return member.id ?? member.member_id ?? member.memberId ?? null;
+}
+
+function firstNonEmpty(obj, keys, fallback = '') {
+  for (const key of keys || []) {
+    const value = obj?.[key];
+    if (value != null && String(value).trim() !== '') return value;
+  }
+  return fallback;
+}
+
+function memberFlags(member = {}) {
+  const guardian = member.guardian || {};
+  const isMinor =
+    truthy(member.isMinor) ||
+    truthy(member.minor) ||
+    truthy(member.is_minor);
+  const confirmed =
+    truthy(member.confirmed) ||
+    truthy(member.is_confirmed) ||
+    truthy(member.confirmedAt) ||
+    truthy(member.confirmed_at);
+  const guardianApproved =
+    truthy(member.guardianApproved) ||
+    truthy(member.guardian_approved) ||
+    truthy(member.guardianApproval) ||
+    truthy(guardian.approved);
+  const active =
+    member.active === undefined ? true : truthy(member.active);
+  return { isMinor, confirmed, guardianApproved, active };
+}
+
+function extractGuardian(member = {}) {
+  const guardian = member.guardian || {};
+  const first = firstNonEmpty(guardian, ['first_name', 'firstName']);
+  const last = firstNonEmpty(guardian, ['last_name', 'lastName']);
+  const email = firstNonEmpty(guardian, ['email', 'emailAddress']) ||
+    firstNonEmpty(member, ['guardian_email', 'guardianEmail']);
+  const phone = firstNonEmpty(guardian, ['phone', 'phoneNumber']) ||
+    firstNonEmpty(member, ['guardian_phone', 'guardianPhone']);
+  const approved =
+    truthy(guardian.approved) ||
+    truthy(member.guardianApproved) ||
+    truthy(member.guardian_approved);
+  return { first, last, email, phone, approved };
+}
+
+function formatGuardianSummary(member = {}) {
+  const { first, last, email, phone, approved } = extractGuardian(member);
+  if (!first && !last && !email && !phone) return '';
+  const name = [first, last].filter(Boolean).join(' ').trim();
+  const contact = [email, phone].filter(Boolean).join(' | ');
+  const bits = [];
+  if (name) bits.push(name);
+  if (contact) bits.push(contact);
+  bits.push(`Approved: ${approved ? 'Yes' : 'No'}`);
+  return `Guardian: ${bits.join(' | ')}`;
+}
+
+function formatUsd(amountCents) {
+  if (amountCents == null) return '';
+  const dollars = Number(amountCents) / 100;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(dollars);
+}
+
+function memberSnapshot(tripId, member, { includeGuardian = false } = {}) {
+  if (!member) return 'Member unavailable';
+  const id = memberPrimaryId(member);
+  const label = memberLabel(member) || (id ? `Member ${id}` : 'Member');
+  const email = firstNonEmpty(member, ['email', 'emailAddress']);
+  const phone = firstNonEmpty(member, ['phone', 'phoneNumber']);
+  const contact = [email, phone].filter(Boolean).join(' | ');
+
+  const flags = memberFlags(member);
+  const spot = tripId && id != null ? getAssignedSpotForMember(tripId, id) : null;
+  const coverage = spot ? 'Covered' : 'Pending';
+
+  const details = [`Coverage: ${coverage}`];
+  details.push(`Active: ${flags.active ? 'Yes' : 'No'}`);
+  details.push(`Confirmed: ${flags.confirmed ? 'Yes' : 'No'}`);
+  details.push(`Minor: ${flags.isMinor ? 'Yes' : 'No'}`);
+  if (flags.isMinor) {
+    details.push(`Guardian OK: ${flags.guardianApproved ? 'Yes' : 'No'}`);
+  }
+
+  const parts = [];
+  parts.push(contact ? `${label} (${contact})` : label);
+  parts.push(details.join(' | '));
+
+  if (includeGuardian) {
+    const guardian = formatGuardianSummary(member);
+    if (guardian) parts.push(guardian);
+  }
+
+  return parts.filter(Boolean).join(' | ');
+}
+
+function canonicalMemberView(member = {}) {
+  const flags = memberFlags(member);
+  const guardian = extractGuardian(member);
+  return {
+    firstName: firstNonEmpty(member, ['first_name', 'firstName']) || 'N/A',
+    lastName: firstNonEmpty(member, ['last_name', 'lastName']) || 'N/A',
+    email: firstNonEmpty(member, ['email', 'emailAddress']) || 'N/A',
+    phone: firstNonEmpty(member, ['phone', 'phoneNumber']) || 'N/A',
+    active: flags.active ? 'Yes' : 'No',
+    confirmed: flags.confirmed ? 'Yes' : 'No',
+    minor: flags.isMinor ? 'Yes' : 'No',
+    guardianApproved: flags.guardianApproved ? 'Yes' : 'No',
+    guardianName: [guardian.first, guardian.last].filter(Boolean).join(' ') || 'N/A',
+    guardianEmail: guardian.email || 'N/A',
+    guardianPhone: guardian.phone || 'N/A'
+  };
+}
+
+function buildChangeSummary(changes) {
+  if (!changes || changes.length === 0) return '';
+  return changes.map(([field, fromVal, toVal]) => {
+    const from = fromVal == null || fromVal === '' ? 'N/A' : String(fromVal);
+    const to = toVal == null || toVal === '' ? 'N/A' : String(toVal);
+    return `${field}: ${from} -> ${to}`;
+  }).join(' | ');
 }
 
 // tolerant boolean coercion
@@ -159,7 +301,10 @@ function rebalanceCoverage(tripId) {
   const removable = spots.filter(s => s.status === 'UNASSIGNED');
   while (spots.length > desiredSeats && removable.length) {
     const seat = removable.pop();
-    store.remove(T_COVERAGE, seat.id);
+    const key = seat?.id ?? seat?.spot_id;
+    if (key != null) {
+      store.remove(T_COVERAGE, key);
+    }
     spots = getAllocationsByTrip(tripId);
   }
 
@@ -191,7 +336,12 @@ function rebalanceCoverage(tripId) {
     seat.member_id = nextMember.id;
     seat.allocated_at = isoNow();
     store.put(T_COVERAGE, seat);
-    appendEvent({ trip, type:'COVERAGE_ALLOCATED', memberId: nextMember.id });
+    appendEvent({
+      trip,
+      type:'COVERAGE_ALLOCATED',
+      memberId: nextMember.id,
+      notes: `Auto-assigned seat to ${memberSnapshot(tripId, nextMember)}`
+    });
   }
 }
 
@@ -394,7 +544,12 @@ async allocateCoverage(tripId, memberId, { idempotencyKey } = {}){
   open.allocated_at = isoNow();
   store.put(T_COVERAGE, open);
 
-  appendEvent({ trip, type:'COVERAGE_ALLOCATED', memberId });
+  appendEvent({
+    trip,
+    type:'COVERAGE_ALLOCATED',
+    memberId,
+    notes: `Seat assigned to ${memberSnapshot(tripId, member)}`
+  });
 
   return { ok:true, spot_id: open.spot_id, coverage_as_of: open.allocated_at, ...summaryForTrip(trip) };
 },
@@ -414,7 +569,17 @@ async releaseCoverage(tripId, memberId, { reason=null, holdAfterStart=false, ide
   spot.released_at = isoNow();
   store.put(T_COVERAGE, spot);
 
-  appendEvent({ trip, type:'COVERAGE_RELEASED', memberId, notes: reason });
+  const releaseNotes = [
+    `Released coverage for ${memberSnapshot(tripId, member)}`,
+    holdAfterStart ? 'Seat placed on hold' : 'Seat returned to pool'
+  ];
+  if (reason) releaseNotes.push(`Reason: ${reason}`);
+  appendEvent({
+    trip,
+    type:'COVERAGE_RELEASED',
+    memberId,
+    notes: releaseNotes.join(' | ')
+  });
 
   const sum = summaryForTrip(trip);
   return {
@@ -442,7 +607,7 @@ async transferCoverage(tripId, fromMemberId, toMemberId, { idempotencyKey } = {}
   if (!fromSpot) throw new Error('From-member has no assigned coverage');
   if (getAssignedSpotForMember(tripId, toMemberId)) return { ok:true, alreadyCovered:true, ...summaryForTrip(trip) };
 
-  // release → allocate atomically (mock)
+  // release -> allocate atomically (mock)
   fromSpot.status = 'UNASSIGNED';
   fromSpot.member_id = null;
   fromSpot.released_at = isoNow();
@@ -453,7 +618,13 @@ async transferCoverage(tripId, fromMemberId, toMemberId, { idempotencyKey } = {}
   fromSpot.allocated_at = isoNow();
   store.put(T_COVERAGE, fromSpot);
 
-  appendEvent({ trip, type:'COVERAGE_TRANSFERRED', fromMemberId, toMemberId });
+  appendEvent({
+    trip,
+    type:'COVERAGE_TRANSFERRED',
+    fromMemberId,
+    toMemberId,
+    notes: `Transfer: ${memberSnapshot(tripId, from)} -> ${memberSnapshot(tripId, to)}`
+  });
 
   return { ok:true, spot_id: fromSpot.spot_id, coverage_as_of: fromSpot.allocated_at, ...summaryForTrip(trip) };
 },
@@ -468,7 +639,22 @@ async createClaim({ trip_id, member_id, incident_type, description, incident_dat
   if (!readyIds.has(member_id)) throw new Error('Traveler must be covered to file a claim');
 
   const claim_id = `CLM-${new Date().getFullYear()}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-  appendEvent({ trip, type:'CLAIM_SUBMITTED', memberId: member_id, notes: `${incident_type} on ${incident_date} @ ${incident_location}` });
+  const member = store.byId(T_MEMBERS, member_id);
+  const incidentBits = [
+    incident_type ? incident_type : null,
+    incident_date ? `on ${incident_date}` : null,
+    incident_location ? `@ ${incident_location}` : null
+  ].filter(Boolean).join(' ');
+  const pieces = [];
+  if (member) pieces.push(`Claim for ${memberSnapshot(trip_id, member, { includeGuardian: false })}`);
+  if (incidentBits) pieces.push(`Incident: ${incidentBits}`);
+  if (description) pieces.push(`Description: ${description}`);
+  appendEvent({
+    trip,
+    type:'CLAIM_SUBMITTED',
+    memberId: member_id,
+    notes: pieces.join(' | ') || 'Claim submitted'
+  });
 
   return { ok:true, claim_id, status:'SUBMITTED' };
 },
@@ -536,7 +722,7 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     const rate = selectRate(input.region, input.startDate);
     if (!rate) throw new Error('No applicable rate for that start date.');
     const now = new Date().toISOString();
-    return store.insert(T_TRIPS, {
+    const trip = store.insert(T_TRIPS, {
         shortId: nextTripShortId(),        // NEW
         ...input,
         rateCents: rate.amountCents,
@@ -544,6 +730,17 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
         status: 'ACTIVE',
         createdAt: now, updatedAt: now
       });
+    appendEvent({
+      trip,
+      type: 'TRIP_CREATED',
+      notes: [
+        trip.title || trip.shortId || 'Trip created',
+        trip.startDate && trip.endDate ? `Dates: ${trip.startDate} -> ${trip.endDate}` : '',
+        trip.region ? `Region: ${trip.region}` : '',
+        rate?.amountCents != null ? `Rate: ${formatUsd(rate.amountCents)} per day` : ''
+      ].filter(Boolean).join(' | ')
+    });
+    return trip;
       
   },
 
@@ -560,26 +757,111 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
     store.put(T_TRIPS, next);
     rebalanceCoverage(id);
+    const changedEntries = [];
+    const tracked = [
+      ['title', 'Title'],
+      ['startDate', 'Start Date'],
+      ['endDate', 'End Date'],
+      ['region', 'Region'],
+      ['status', 'Status'],
+      ['paymentStatus', 'Payment Status'],
+      ['rateCents', 'Rate'],
+      ['creditsTotalCents', 'Credits']
+    ];
+    for (const [field, label] of tracked) {
+      const before = current[field];
+      const after = next[field];
+      if (before === after) continue;
+      let fromVal = before;
+      let toVal = after;
+      if (field === 'rateCents' || field === 'creditsTotalCents') {
+        fromVal = before == null ? null : formatUsd(before);
+        toVal = after == null ? null : formatUsd(after);
+      }
+      changedEntries.push([label, fromVal, toVal]);
+    }
+    if (changedEntries.length > 0) {
+      const type = changedEntries.some(([label]) => label === 'Status')
+        ? 'TRIP_STATUS_UPDATED'
+        : changedEntries.some(([label]) => label === 'Payment Status')
+        ? 'TRIP_PAYMENT_STATUS_UPDATED'
+        : 'TRIP_UPDATED';
+      appendEvent({
+        trip: next,
+        type,
+        notes: buildChangeSummary(changedEntries)
+      });
+    }
     return next;
   },
 
   async addMembers(tripId, arr){ // [{firstName,lastName,email}]
-    return arr.map(data =>
+    const trip = store.byId(T_TRIPS, tripId);
+    if (!trip) throw new Error('Trip not found');
+    const inserted = arr.map(data =>
       store.insert(T_MEMBERS, { tripId, status: 'IN_PROGRESS', ...data })
     );
+    for (const member of inserted) {
+      appendEvent({
+        trip,
+        type: 'MEMBER_ADDED',
+        memberId: memberPrimaryId(member),
+        notes: `Added ${memberSnapshot(tripId, member, { includeGuardian: true })}`
+      });
+    }
+    return inserted;
   },
 
   async updateMember(memberId, patch){
     const m = store.byId(T_MEMBERS, memberId);
     if (!m) throw new Error('Member not found');
+    const beforeView = canonicalMemberView(m);
     const next = { ...m, ...patch };
     store.put(T_MEMBERS, next);
     rebalanceCoverage(next.tripId);
+    const trip = store.byId(T_TRIPS, next.tripId);
+    if (trip) {
+      const latest = store.byId(T_MEMBERS, memberId) || next;
+      const afterView = canonicalMemberView(latest);
+      const labels = {
+        firstName: 'First Name',
+        lastName: 'Last Name',
+        email: 'Email',
+        phone: 'Phone',
+        active: 'Active',
+        confirmed: 'Confirmed',
+        minor: 'Minor',
+        guardianApproved: 'Guardian Approved',
+        guardianName: 'Guardian Name',
+        guardianEmail: 'Guardian Email',
+        guardianPhone: 'Guardian Phone'
+      };
+      const changeEntries = [];
+      for (const [key, label] of Object.entries(labels)) {
+        if (beforeView[key] === afterView[key]) continue;
+        changeEntries.push([label, beforeView[key], afterView[key]]);
+      }
+      const pieces = [
+        `Updated ${memberSnapshot(trip.id, latest, { includeGuardian: true })}`
+      ];
+      if (changeEntries.length > 0) {
+        pieces.push(`Changes: ${buildChangeSummary(changeEntries)}`);
+      }
+      appendEvent({
+        trip,
+        type: 'MEMBER_UPDATED',
+        memberId: memberPrimaryId(latest),
+        notes: pieces.join(' | ')
+      });
+    }
     return next;
   },
 
   async removeMember(memberId){
     const member = store.byId(T_MEMBERS, memberId);
+    const trip = member ? store.byId(T_TRIPS, member.tripId) : null;
+    const wasCovered = member ? !!getAssignedSpotForMember(member.tripId, memberId) : false;
+    const snapshotNote = member ? memberSnapshot(member.tripId, member, { includeGuardian: true }) : '';
     store.remove(T_MEMBERS, memberId);
     if (member) {
       const spot = getAssignedSpotForMember(member.tripId, memberId);
@@ -590,6 +872,17 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
         store.put(T_COVERAGE, spot);
       }
       rebalanceCoverage(member.tripId);
+      if (trip) {
+        const refreshedTrip = store.byId(T_TRIPS, member.tripId) || trip;
+        const pieces = [`Removed ${snapshotNote}`];
+        if (wasCovered) pieces.push('Seat returned to pool');
+        appendEvent({
+          trip: refreshedTrip,
+          type: 'MEMBER_REMOVED',
+          memberId: memberPrimaryId(member),
+          notes: pieces.join(' | ')
+        });
+      }
     }
     return true;
   },
@@ -601,43 +894,63 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
 
     // 1) Increase credits
     const before = Number(trip.creditsTotalCents || 0);
-  const after = before + Number(amountCents || 0);
-  trip.creditsTotalCents = after;
-  trip.spot_price_cents = trip.spot_price_cents || computeSpotPriceCents(trip);
-  store.put(T_TRIPS, trip);
+    const after = before + Number(amountCents || 0);
+    trip.creditsTotalCents = after;
+    trip.spot_price_cents = trip.spot_price_cents || computeSpotPriceCents(trip);
+    store.put(T_TRIPS, trip);
 
-  appendEvent({ trip, type: 'PAYMENT_APPLIED', amountCents });
-
-  // 2) Create UNASSIGNED spots from purchasable capacity
-  const spotPrice = trip.spot_price_cents || 0;
-  if (spotPrice <= 0) {
-    rebalanceCoverage(tripId);
-    return { ok: true, created: 0, autoAllocated: 0, ...summaryForTrip(trip) };
-  }
-
-  const spots = getAllocationsByTrip(tripId);
-  const assigned = spots.filter(s => s.status === 'ASSIGNED').length;
-  const unassigned = spots.filter(s => s.status === 'UNASSIGNED').length;
-  const totalSpotsExisting = assigned + unassigned;
-
-  const maxSpotsNow = Math.floor(after / spotPrice);
-  const createCount = Math.max(0, maxSpotsNow - totalSpotsExisting);
-
-  for (let i = 0; i < createCount; i++) {
-    store.add(T_COVERAGE, {
-      spot_id: ulid(),
-      trip_id: tripId,
-      member_id: null,
-      status: 'UNASSIGNED',
-      allocated_at: null,
-      released_at: null,
-      notes: null
+    const amount = Number(amountCents || 0);
+    const noteParts = [];
+    noteParts.push(amount === 0
+      ? 'No charge — refreshed seat inventory to match existing credits.'
+      : `Applied ${formatUsd(amount)}`);
+    noteParts.push(`Credits: ${formatUsd(before)} -> ${formatUsd(after)}`);
+    appendEvent({
+      trip,
+      type: 'PAYMENT_APPLIED',
+      amountCents: amount,
+      creditsBeforeCents: before,
+      creditsAfterCents: after,
+      notes: noteParts.join(' | ')
     });
-  }
+    // 2) Create UNASSIGNED spots from purchasable capacity
+    const spotPrice = trip.spot_price_cents || 0;
+    if (spotPrice <= 0) {
+      rebalanceCoverage(tripId);
+      return { ok: true, created: 0, autoAllocated: 0, ...summaryForTrip(trip) };
+    }
 
-  rebalanceCoverage(tripId);
+    const spots = getAllocationsByTrip(tripId);
+    const assigned = spots.filter(s => s.status === 'ASSIGNED').length;
+    const unassigned = spots.filter(s => s.status === 'UNASSIGNED').length;
+    const totalSpotsExisting = assigned + unassigned;
+
+    const maxSpotsNow = Math.floor(after / spotPrice);
+    const createCount = Math.max(0, maxSpotsNow - totalSpotsExisting);
+
+    for (let i = 0; i < createCount; i++) {
+      store.add(T_COVERAGE, {
+        spot_id: ulid(),
+        trip_id: tripId,
+        member_id: null,
+        status: 'UNASSIGNED',
+        allocated_at: null,
+        released_at: null,
+        notes: null
+      });
+    }
+
+    rebalanceCoverage(tripId);
 
   return { ok: true, created: createCount, autoAllocated: 0, ...summaryForTrip(trip) };
+  },
+
+  async syncCoverageInventory(tripId) {
+    const trip = store.byId(T_TRIPS, tripId);
+    if (!trip) throw new Error('Trip not found');
+    rebalanceCoverage(tripId);
+    const refreshedTrip = store.byId(T_TRIPS, tripId) || trip;
+    return summaryForTrip(refreshedTrip);
   },
 
   async listMembers(tripId) {
@@ -677,7 +990,12 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     unassigned.allocated_at = isoNow();
     store.put(T_COVERAGE, unassigned);
 
-    appendEvent({ trip, type:'COVERAGE_ALLOCATED', memberId: member.id });
+    appendEvent({
+      trip,
+      type:'COVERAGE_ALLOCATED',
+      memberId: member.id,
+      notes: `Seat assigned to ${memberSnapshot(tripId, member)}`
+    });
 
     return summaryForTrip(trip);
   }
@@ -722,7 +1040,12 @@ export async function seedCoverageIfNeeded(){
         notes: null
       };
       store.add(T_COVERAGE, s);
-      appendEvent({ trip, type:'COVERAGE_ALLOCATED', memberId: m.id });
+      appendEvent({
+        trip,
+        type:'COVERAGE_ALLOCATED',
+        memberId: m.id,
+        notes: `Auto-seeded coverage for ${memberSnapshot(trip.id, m)}`
+      });
     }
 
     // Create UNASSIGNED spots

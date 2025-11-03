@@ -25,6 +25,8 @@ export default function Admin(){
   // ---- Rates state ----
   const [rates, setRates] = useState([])
   const [form, setForm] = useState({ region:'DOMESTIC', amount:'1.25', effectiveStart:'', notes:'' })
+  const [ratesExpanded, setRatesExpanded] = useState(false)
+  const [showAddRate, setShowAddRate] = useState(false)
 
   // load trips + counts
   useEffect(()=>{
@@ -41,10 +43,25 @@ export default function Admin(){
   },[])
 
   // rates init
-  useEffect(()=>{
-    seedRatesIfEmpty()
-    setRates(listRates())
-  },[])
+useEffect(()=>{
+  seedRatesIfEmpty()
+  setRates(listRates())
+},[])
+
+  const activeRates = useMemo(() => {
+    const latestByRegion = new Map()
+    for (const rate of rates) {
+      if (!latestByRegion.has(rate.region)) {
+        latestByRegion.set(rate.region, rate)
+      }
+    }
+    return Array.from(latestByRegion.values())
+  }, [rates])
+
+  const historicalRates = useMemo(() => {
+    const activeIds = new Set(activeRates.map(r => r.id))
+    return rates.filter(r => !activeIds.has(r.id))
+  }, [rates, activeRates])
 
   const counts = useMemo(()=>{
     const c = { ACTIVE:0, ARCHIVED:0, ALL: trips.length }
@@ -157,7 +174,8 @@ export default function Admin(){
       createRate({ region: form.region, amountCents: cents, effectiveStart: form.effectiveStart, notes: form.notes })
       refreshRates()
       setMsg('Rate added. New trips will snapshot based on start date.')
-      setForm(f=>({...f, notes:''}))
+      setForm({ region:'DOMESTIC', amount:'1.25', effectiveStart:'', notes:'' })
+      setShowAddRate(false)
       setTimeout(()=>setMsg(''), 2500)
     }catch(ex){ setErr(ex.message || 'Failed to add rate') }
   }
@@ -229,7 +247,7 @@ export default function Admin(){
                     <td><span className="badge text-bg-light">{t.region}</span></td>
                     <td>{membersByTrip[t.id] || 0}</td>
                     <td>
-                      <span className={`badge ${t.paymentStatus==='PAID' ? 'text-bg-success' : 'text-bg-warning'}`}>
+                      <span className={`badge ${t.paymentStatus==='PAID' ? 'bg-agf2 text-white' : 'bg-melon'}`}>
                         {t.paymentStatus}
                       </span>
                     </td>
@@ -304,58 +322,110 @@ export default function Admin(){
 
       {/* ---- Rates Manager ---- */}
       <div className="card p-3 mb-4 no-hover">
-        <div className="d-flex justify-content-between align-items-center mb-2">
+        <div className="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
           <h2 className="h5 mb-0">Rates</h2>
+          <div className="d-flex gap-2">
+            {historicalRates.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-outline-secondary btn-sm"
+                onClick={() => setRatesExpanded(v => !v)}
+              >
+                {ratesExpanded ? 'Hide rate history' : 'View rate history'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowAddRate(v => !v)}
+            >
+              {showAddRate ? 'Close rate form' : 'Add new rate'}
+            </button>
+          </div>
         </div>
 
-        <form className="row g-2" onSubmit={addRate}>
-          <div className="col-md-3">
-            <label className="form-label">Region</label>
-            <select className="form-select" value={form.region} onChange={e=>setForm(f=>({...f, region:e.target.value}))}>
-              <option value="DOMESTIC">Domestic</option>
-              <option value="INTERNATIONAL">International</option>
-            </select>
-          </div>
-          <div className="col-md-3">
-            <label className="form-label">Amount (USD / day)</label>
-            <input className="form-control" value={form.amount} onChange={e=>setForm(f=>({...f, amount:e.target.value}))}/>
-          </div>
-          <div className="col-md-3">
-            <label className="form-label">Effective start</label>
-            <input type="date" className="form-control" value={form.effectiveStart} onChange={e=>setForm(f=>({...f, effectiveStart:e.target.value}))}/>
-          </div>
-          <div className="col-md-3">
-            <label className="form-label">Notes</label>
-            <input className="form-control" value={form.notes} onChange={e=>setForm(f=>({...f, notes:e.target.value}))}/>
-          </div>
-          <div className="col-12">
-            <button className="btn btn-primary">Add Rate</button>
-          </div>
-        </form>
-
-        <div className="table-responsive mt-3">
+        <div className="table-responsive">
           <table className="table table-sm align-middle mb-0">
             <thead>
               <tr>
-                <th>Region</th>
-                <th>Amount</th>
-                <th>Effective Start</th>
+                <th style={{ width: '20%' }}>Region</th>
+                <th style={{ width: '20%' }}>Amount</th>
+                <th style={{ width: '20%' }}>Effective Start</th>
                 <th>Notes</th>
               </tr>
             </thead>
             <tbody>
-              {rates.map(r=>(
+              {activeRates.map(r => (
                 <tr key={r.id}>
-                  <td>{r.region}</td>
+                  <td><span className="badge bg-agf2 text-white">{r.region}</span></td>
                   <td>${(r.amountCents/100).toFixed(2)}</td>
                   <td>{r.effectiveStart}</td>
-                  <td className="text-muted">{r.notes||''}</td>
+                  <td className="text-muted">{r.notes || 'Current rate'}</td>
                 </tr>
               ))}
-              {rates.length===0 && <tr><td colSpan="4" className="text-muted">No rates yet.</td></tr>}
+              {activeRates.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="text-muted">No rates configured yet.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {showAddRate && (
+          <form className="row g-3 mt-3 border-top pt-3" onSubmit={addRate}>
+            <div className="col-md-3">
+              <label className="form-label">Region</label>
+              <select className="form-select" value={form.region} onChange={e=>setForm(f=>({...f, region:e.target.value}))}>
+                <option value="DOMESTIC">Domestic</option>
+                <option value="INTERNATIONAL">International</option>
+              </select>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label">Amount (USD / day)</label>
+              <input className="form-control" value={form.amount} onChange={e=>setForm(f=>({...f, amount:e.target.value}))}/>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label">Effective start</label>
+              <input type="date" className="form-control" value={form.effectiveStart} onChange={e=>setForm(f=>({...f, effectiveStart:e.target.value}))}/>
+            </div>
+            <div className="col-md-3">
+              <label className="form-label">Notes</label>
+              <input className="form-control" value={form.notes} onChange={e=>setForm(f=>({...f, notes:e.target.value}))}/>
+            </div>
+            <div className="col-12 d-flex gap-2 justify-content-end">
+              <button type="button" className="btn btn-outline-secondary" onClick={() => setShowAddRate(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary">Save rate</button>
+            </div>
+          </form>
+        )}
+
+        {ratesExpanded && historicalRates.length > 0 && (
+          <div className="table-responsive mt-3">
+            <table className="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th style={{ width: '20%' }}>Region</th>
+                  <th style={{ width: '20%' }}>Amount</th>
+                  <th style={{ width: '20%' }}>Effective Start</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historicalRates.map(r => (
+                  <tr key={r.id}>
+                    <td>{r.region}</td>
+                    <td>${(r.amountCents/100).toFixed(2)}</td>
+                    <td>{r.effectiveStart}</td>
+                    <td className="text-muted">{r.notes || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ---- Reports ---- */}
@@ -378,7 +448,7 @@ export default function Admin(){
                   <h5 className="modal-title">Trip History</h5>
                   <button type="button" className="btn-close" onClick={closeHistory}></button>
                 </div>
-                <div className="modal-body">
+                <div className="modal-body small">
                   {historyLoading && <div className="py-4 text-center">Loading history…</div>}
                   {!historyLoading && historyError && (
                     <div className="alert alert-danger">{historyError?.message || 'Unable to load history.'}</div>
@@ -387,12 +457,12 @@ export default function Admin(){
                     <>
                       <div className="mb-3 small text-muted">
                         <div><strong>Trip:</strong> {historyTrip.title || 'Trip'} ({historyTrip.shortId || historyTrip.id})</div>
-                        <div><strong>Dates:</strong> {historyTrip.startDate || '—'} → {historyTrip.endDate || '—'}</div>
+                        <div><strong>Dates:</strong> {historyTrip.startDate || '—'} -> {historyTrip.endDate || '—'}</div>
                         <div><strong>Region:</strong> {historyTrip.region || '—'}</div>
                         <div><strong>Status:</strong> {historyTrip.status || '—'}</div>
                       </div>
                       <div className="table-responsive">
-                        <table className="table table-sm align-middle">
+                        <table className="table table-sm align-middle small" style={{ fontSize: '0.85rem' }}>
                           <thead>
                             <tr>
                               <th style={{width:'20%'}}>Timestamp</th>
@@ -409,7 +479,7 @@ export default function Admin(){
                                 <tr key={evt.event_id || evt.timestamp}>
                                   <td>{evt.timestamp ? new Date(evt.timestamp).toLocaleString() : '—'}</td>
                                   <td>{evt.type || '—'}</td>
-                                  <td>{evt.actor_role ? `${evt.actor_role}${evt.actor_id ? ' · ' + evt.actor_id : ''}` : (evt.actor_id || '—')}</td>
+                                  <td>{evt.actor_role ? `${evt.actor_role}${evt.actor_id ? ' | ' + evt.actor_id : ''}` : (evt.actor_id || '—')}</td>
                                   <td>{evt.notes || ''}</td>
                                 </tr>
                               ))

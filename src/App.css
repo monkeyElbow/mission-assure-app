@@ -117,17 +117,27 @@ footer a:hover {
   --bs-navbar-hover-color: #0B0E11;
 } */
 
+.agf1{
+  color: var(--agf1);
+}
+.agf2{
+  color: var(--agf2);
+}
+
 .bg-afgi1, .bg-agf1 {
   fill:var(--agf1);
   background-color: var(--agf1);
+  color: #fff !important;
 }
 .bg-afgi1:hover {
   fill:var(--agf2);
   background-color: var(--agf2);
 }
 .bg-agf2 {
-  background-color: var(--agf2);
+  background-color: var(--agf2) !important;
+  color: #fff !important;
 }
+
 
 .bg-dark {
   background-color: var(--dark);
@@ -138,10 +148,12 @@ footer a:hover {
   color: var(--mango);
 }
 .bg-mango{
-  background-color: var(--mango);
+  background-color: var(--mango) !important;
+  color: #212529 !important;
 }
 .bg-melon{
-  background-color: var(--melon);
+  background-color: var(--melon) !important;
+  color: #212529 !important;
 }
 .bg-sand{
   background-color: var(--sand);
@@ -179,6 +191,9 @@ footer a:hover {
   fill: var(--agf1);
   transition: fill 0.25s ease;
 }
+
+
+
 .agfi-logo .bg-dark {
   fill: var(--dark);
   transition: fill 0.25s ease;

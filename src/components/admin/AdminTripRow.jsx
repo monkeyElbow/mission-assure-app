@@ -4,11 +4,11 @@ function fmt(d){ try{ return new Date(d).toLocaleDateString() } catch{ return d 
 
 export default function AdminTripRow({ trip, onQuickEdit, onArchiveToggle, onSelectTrip }){
   const statusBadge = (s)=>{
-    const map = { LIVE:'bg-success', PAUSED:'bg-secondary', ARCHIVED:'bg-dark', DRAFT:'bg-info' }
+    const map = { LIVE:'bg-agf2', PAUSED:'bg-secondary', ARCHIVED:'bg-dark', DRAFT:'bg-info' }
     return <span className={`badge ${map[s]||'bg-secondary'}`}>{s}</span>
   }
   const payBadge = (s)=>{
-    const map = { PAID:'bg-success', PARTIAL:'bg-warning text-dark', UNPAID:'bg-danger' }
+    const map = { PAID:'bg-agf2', PARTIAL:'bg-melon text-dark', UNPAID:'bg-danger' }
     return <span className={`badge ${map[s]||'bg-secondary'}`}>{s||'UNPAID'}</span>
   }
   return (
