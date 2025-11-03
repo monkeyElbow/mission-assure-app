@@ -151,34 +151,39 @@ export default function TripMembersList({
             ))}
           </div>
 
-          {!spotAddOpen && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm mt-3 d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
-              style={{ borderRadius: 6, letterSpacing: '0.05em' }}
-              onClick={() => onSpotAddToggle(true)}
-              aria-label="Add person"
-            >
-              <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
-              <span>Add person</span>
-            </button>
-          )}
-
         </div>
         <div className="card-footer bg-transparent border-0 pt-0">
-          <div className="d-flex flex-wrap align-items-center gap-2 small text-muted">
-            <span className="d-inline-flex align-items-center gap-1">
-              <span className="bg-agf1" style={{ width: 12, height: 12, borderRadius: 3, display: 'inline-block' }}></span>
-              Covered
-            </span>
-            <span className="d-inline-flex align-items-center gap-1">
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#ffc107', display: 'inline-block' }}></span>
-              Pending
-            </span>
-            <span className="d-inline-flex align-items-center gap-1">
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6', display: 'inline-block' }}></span>
-              Paid / Unassigned
-            </span>
+          <div className="row align-items-center g-2">
+            <div className="col-12 col-md">
+              <div className="d-flex flex-wrap align-items-center gap-2 small text-muted">
+                <span className="d-inline-flex align-items-center gap-1">
+                  <span className="bg-agf1" style={{ width: 12, height: 12, borderRadius: 3, display: 'inline-block' }}></span>
+                  Covered
+                </span>
+                <span className="d-inline-flex align-items-center gap-1">
+                  <span style={{ width: 12, height: 12, borderRadius: 3, background: '#ffc107', display: 'inline-block' }}></span>
+                  Pending
+                </span>
+                <span className="d-inline-flex align-items-center gap-1">
+                  <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6', display: 'inline-block' }}></span>
+                  Paid / Unassigned
+                </span>
+              </div>
+            </div>
+            <div className="col-12 col-md-auto text-md-end">
+              {!spotAddOpen && (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
+                  style={{ borderRadius: 6, letterSpacing: '0.05em' }}
+                  onClick={() => onSpotAddToggle(true)}
+                  aria-label="Add person"
+                >
+                  <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
+                  <span>Add person</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {spotAddOpen && spotAddForm && (
