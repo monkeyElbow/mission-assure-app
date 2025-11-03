@@ -22,8 +22,15 @@ footer #brandfont{
   fill:white;
 }
 
+
 footer #brandfont:hover{
   fill: var(--sand);
+}
+
+/* scooch logo */
+footer .brand-logo svg{
+  position: relative;
+  left:-8px;
 }
 
 html, body, #root { 
@@ -151,6 +158,10 @@ footer a:hover {
   background: #f3f1ef;
 }
 
+.card.no-hover:hover{
+  background: inherit;
+}
+
 /* app logo */
 .brand-logo svg { height: 60px; display: block; }
 .brand-logo { line-height: 0; }
@@ -219,3 +230,32 @@ footer a:hover {
   will-change: transform, opacity;
 }
 .intro-area h1.mango { color: #F5A623 !important; }
+
+
+/* expand add person to MINOR */
+/* Collapsible height animation */
+.minor-wrap {
+  overflow: hidden;
+  height: 0;                      /* JS will set pixel height */
+  transition: height 280ms ease;  /* smooth container resize */
+}
+
+/* Field entrance animation */
+.minor-field {
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease;
+}
+
+/* When container is "open", reveal fields with a tiny stagger */
+.minor-wrap.is-open .minor-field {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Optional stagger per field using a CSS var set inline */
+.minor-field {
+  transition-delay: var(--d, 0ms);
+}

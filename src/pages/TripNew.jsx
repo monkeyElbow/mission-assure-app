@@ -14,6 +14,10 @@ export default function TripNew(){
     e.preventDefault();
     setErr('');
     if(!title || !startDate || !endDate){ setErr('Please fill all fields.'); return; }
+    if (startDate >= endDate) {
+      setErr('End date must be after start date.');
+      return;
+    }
     try{
       const trip = await api.createTrip({ title, startDate, endDate, region });
       nav(`/trips/${trip.id}`);

@@ -8,8 +8,12 @@ export default function MemberConfirmModal({ open, onClose, member, onDone }) {
 
   async function handleConfirm() {
     if (!agree) return
-    await api.updateMember(member.id, { confirmed: true })
-    onDone?.(); onClose?.()
+    await api.updateMember(member.id, {
+      confirmed: true,
+      confirmedAt: new Date().toISOString(),
+      is_confirmed: true
+    })
+    onDone?.(member); onClose?.()
   }
 
   return (

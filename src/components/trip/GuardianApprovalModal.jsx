@@ -8,8 +8,20 @@ export default function GuardianApprovalModal({ open, onClose, member, onDone })
 
   async function handleApprove() {
     if (!agree) return
-    await api.updateMember(member.id, { guardianApproved: true })
-    onDone?.(); onClose?.()
+    await api.updateMember(member.id, {
+      guardianApproved: true,
+      guardian_approved: true,
+      guardian: {
+        ...(member.guardian || {}),
+        first_name: member.guardianFirst || member.guardian_first_name || member.guardian?.first_name || '',
+        last_name: member.guardianLast || member.guardian_last_name || member.guardian?.last_name || '',
+        email: member.guardianEmail || member.guardian_email || member.guardian?.email || '',
+        phone: member.guardianPhone || member.guardian_phone || member.guardian?.phone || '',
+        approved: true,
+        approved_at: new Date().toISOString()
+      }
+    })
+    onDone?.(member); onClose?.()
   }
 
   return (

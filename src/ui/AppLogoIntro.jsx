@@ -1,4 +1,3 @@
-// AppLogoIntro.jsx
 import { useEffect, useRef } from "react";
 
 export default function AppLogoIntro({
@@ -10,7 +9,7 @@ export default function AppLogoIntro({
       shackle: 200,  // (kept for reference; not used in the new 3-step)
       slide: 450,    // mission left / assure right
       headline: 500, // headline fade in
-      hold: 2000,    // linger time before fade-out
+      hold: 1500,    // linger time before fade-out
       fadeOut: 250,  // fade out
       overlaps: {
         shackleStart: 550, // overlaps with fade-in
@@ -71,12 +70,24 @@ export default function AppLogoIntro({
       });
   
       // --- WORDS SLIDE APART ---
-      at(timings.overlaps.slideStart, () => {
-        txt.style.transition = `transform ${timings.slide}ms ease-out`;
-        asr.style.transition = `transform ${timings.slide}ms ease-out`;
-        txt.style.transform = "translateX(-28px)";
-        asr.style.transform = "translateX(28px)";
-      });
+ // --- INIT ---
+root.style.opacity = 0;
+
+const slidePx = 28; // tweak to taste
+txt.style.transform = `translateX(-${slidePx}px)`; // left word starts left
+asr.style.transform = `translateX(${slidePx}px)`;  // right word starts right
+
+shk.style.transform = "translateY(0)";
+h1.style.opacity = 0;
+// --- WORDS SLIDE TO ORIGIN ---
+at(timings.overlaps.slideStart, () => {
+    txt.style.transition = `transform ${timings.slide}ms ease-out`;
+    asr.style.transition = `transform ${timings.slide}ms ease-out`;
+    txt.style.transform = "translateX(0)";
+    asr.style.transform = "translateX(0)";
+  });
+  
+
   
       // --- HEADLINE IN ---
       at(timings.overlaps.h1Start, () => {

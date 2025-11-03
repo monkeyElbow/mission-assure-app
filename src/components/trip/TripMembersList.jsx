@@ -1,288 +1,262 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { api } from '/src/data/api.local.js'
-import MemberConfirmModal from './MemberConfirmModal.jsx'
-import GuardianApprovalModal from './GuardianApprovalModal.jsx'
+import React from 'react'
 
-const listVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: { staggerChildren: 0.06, when: 'beforeChildren' }
-  }
-}
-const itemVariants = {
-  hidden: { opacity: 0, y: 8 },
-  show: { opacity: 1, y: 0 }
-}
+export default function TripMembersList({
+  ready = [],
+  pending = [],
+  overviewReady = ready,
+  overviewPending = pending,
+  coveredCount = 0,
+  pendingCount = 0,
+  unassignedSpots = 0,
+  spotAddOpen = false,
+  onSpotAddToggle = () => {},
+  spotAddForm = null,
+  rosterError = null,
+  searchTerm = '',
+  onSearchTermChange = () => {},
+  searchActive = false,
+  onMemberFocus,
+  renderReadyItem,
+  renderPendingItem
+}) {
+  const renderReady = renderReadyItem || (() => null);
+  const renderPending = renderPendingItem || (() => null);
+  const totalMatches = ready.length + pending.length;
+  const readyMatchIds = new Set(ready.map((m) => String(m.member_id ?? m.id ?? '')));
+  const pendingMatchIds = new Set(pending.map((m) => String(m.member_id ?? m.id ?? '')));
+  const searchLabel = searchTerm.trim();
 
-export default function TripMembersList({ trip, members = [], onChanged }) {
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [guardianOpen, setGuardianOpen] = useState(false)
-  const [activeMember, setActiveMember] = useState(null)
-  const [editingId, setEditingId] = useState(null)
-  async function handleRemove(memberId) { // NEW
-    if (!confirm('Remove this person from the trip?')) return;
-    if (typeof api.deleteMember === 'function') {
-      await api.deleteMember(memberId);
-    } else if (typeof api.removeMember === 'function') {
-      await api.removeMember(memberId);
-    } else {
-      // Fallback: if your API lacks a delete endpoint, wire one up there.
-      throw new Error('Missing api.deleteMember / api.removeMember');
-    }
-    onChanged?.();
-  }
-  
-  const unconfirmedCount = (members || []).filter(m =>
-    m.isMinor ? !m.guardianApproved : !m.confirmed
-  ).length;
-  
+  const handleSearchInput = (event) => onSearchTermChange?.(event.target.value);
+  const clearSearch = () => onSearchTermChange?.('');
 
-  async function handleConfirmClick(member){
-    if (member.isMinor) return;
-    if (member.confirmed) {
-      await api.updateMember?.(member.id, { confirmed: false, confirmedAt: null });
-      onChanged?.();
-    } else {
-      setActiveMember(member);
-      setConfirmOpen(true);
-    }
-  }
-  async function handleGuardianClick(member){
-    if (!member.isMinor) return;
-    if (member.guardianApproved) {
-      await api.updateMember?.(member.id, { guardianApproved: false, guardianApprovedAt: null });
-      onChanged?.();
-    } else {
-      setActiveMember(member);
-      setGuardianOpen(true);
-    }
-  }
-  
-  
+  const labelForMember = (member) => {
+    const first = member.first_name || member.firstName || '';
+    const last = member.last_name || member.lastName || '';
+    const full = `${first} ${last}`.trim();
+    if (full) return full;
+    if (member.email) return member.email.trim();
+    return `Member ${member.member_id ?? member.id ?? ''}`.trim();
+  };
+
+  const readyEmptyText = searchActive ? 'No ready travelers match your search.' : 'No covered travelers yet.';
+  const pendingEmptyText = searchActive ? 'No pending travelers match your search.' : 'No pending travelers.';
 
   return (
-    <div className="card">
-      <div className="card-header d-flex align-items-center">
-        <strong className="me-2">People on this trip</strong>
-        <span className="badge bg-secondary">{members.length}</span>
+    <div className="d-flex flex-column gap-3">
+      {rosterError && (
+        <div className="alert alert-danger mb-0">
+          Roster error: {String(rosterError)}
+        </div>
+      )}
 
-        {unconfirmedCount > 0 && (
-    <span className="badge bg-melon text-light ms-3">
-      {unconfirmedCount} not confirmed
-    </span>
-        )}
+      <div className="card">
+        <div className="card-header fw-semibold">Spot Overview</div>
+        <div className="card-body pb-2">
+          <div
+            className="d-grid"
+            style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(14px,1fr))', gap: 4, padding: '6px 0' }}
+          >
+            {overviewReady.map((m, i) => {
+              const label = labelForMember(m);
+              const quickLabel = label.trim();
+              const key = m.member_id ?? m.id ?? i;
+              const isMatch = readyMatchIds.has(String(m.member_id ?? m.id ?? ''));
+              const handleActivate = () => onMemberFocus?.(quickLabel);
+              const style = {
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                backgroundColor: '#00ADBB',
+                border: 'none',
+                cursor: onMemberFocus ? 'pointer' : 'default',
+                opacity: searchActive && !isMatch ? 0.25 : 1
+              };
 
+              if (onMemberFocus) {
+                return (
+                  <div
+                    key={`cov-${key}-${i}`}
+                    title={`Covered: ${label}`}
+                    role="button"
+                    tabIndex={0}
+                    style={style}
+                    onClick={handleActivate}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleActivate();
+                      }
+                    }}
+                  />
+                );
+              }
 
-      </div>
-
-      <motion.div
-        className="list-group list-group-flush"
-        variants={listVariants}
-        initial="hidden"
-        animate="show"
-      >
-        {members.length === 0 && (
-          <div className="list-group-item text-muted">No people added yet.</div>
-        )}
-        {members.map(m => (
-          <motion.div key={m.id} variants={itemVariants} className="list-group-item">
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              <div className="me-auto">
-                <div className="fw-semibold">{m.firstName} {m.lastName}</div>
-                <div className="text-muted small">{m.email}{m.phone ? ` • ${m.phone}` : ''}</div>
-                {m.isMinor && (
-  <div className="text-muted small">
-    Minor{m.guardianName ? ` • Guardian: ${m.guardianName}` : ''}
-  </div>
-)}
-</div> {/* closes the LEFT column */}
-
-{/* RIGHT column: wrap badges in a container */}
-<div className="d-flex gap-2 flex-wrap">
-{/* Adults: Confirm only */}
-{!m.isMinor && (
-  <span
-    role="button"
-    className={`badge ${m.confirmed ? 'bg-agf1' : 'bg-melon'} px-3 py-2`}
-    onClick={async () => {
-      if (m.confirmed) {
-        await api.updateMember(m.id, { confirmed: false, confirmedAt: null });
-        onChanged?.();
-      } else {
-        setActiveMember(m);
-        setConfirmOpen(true);
-      }
-    }}
-  >
-    {m.confirmed ? 'Confirmed' : 'Confirmation Needed'}
-  </span>
-)}
-
-
-{/* Minors: Guardian only */}
-{m.isMinor && (
-  <span
-    role="button"
-    className={`badge ${m.guardianApproved ? 'bg-agf1' : 'bg-mango text-dark'} px-3 py-2`}
-    onClick={async () => {
-      if (m.guardianApproved) {
-        await api.updateMember(m.id, { guardianApproved: false, guardianApprovedAt: null });
-        onChanged?.();
-      } else {
-        setActiveMember(m);
-        setGuardianOpen(true);
-      }
-    }}
-  >
-    {m.guardianApproved ? 'Guardian Approved' : 'Guardian Confirmation Needed'}
-  </span>
-)}
-
-</div>
-
-
-{editingId !== m.id && ( 
-  <button
-    className="btn btn-sm btn-outline-primary"
-    onClick={() => setEditingId(editingId === m.id ? null : m.id)}
-  >
-    Edit
-  </button>
-)}
-
-
-              
-              {editingId === m.id && (
-  <button
-    className="btn btn-sm btn-outline-danger"
-    onClick={() => handleRemove(m.id)}
-  >
-    Delete
-  </button>
-)}
-            </div>
-
-            {editingId === m.id && (
-              <div className="mt-3 border-top pt-3">
-                <MemberInlineEditor
-                  member={m}
-                  onClose={() => setEditingId(null)}
-                  onSaved={() => { setEditingId(null); onChanged?.() }}
+              return (
+                <div
+                  key={`cov-${key}-${i}`}
+                  title={`Covered: ${label}`}
+                  style={style}
                 />
-              </div>
+              );
+            })}
+            {overviewPending.map((m, i) => {
+              const label = labelForMember(m);
+              const quickLabel = label.trim();
+              const key = m.member_id ?? m.id ?? i;
+              const isMatch = pendingMatchIds.has(String(m.member_id ?? m.id ?? ''));
+              const handleActivate = () => onMemberFocus?.(quickLabel);
+              const style = {
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                backgroundColor: '#ffc107',
+                border: 'none',
+                cursor: onMemberFocus ? 'pointer' : 'default',
+                opacity: searchActive && !isMatch ? 0.25 : 1
+              };
+
+              if (onMemberFocus) {
+                return (
+                  <div
+                    key={`pen-${key}-${i}`}
+                    title={`Pending: ${label}`}
+                    role="button"
+                    tabIndex={0}
+                    style={style}
+                    onClick={handleActivate}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleActivate();
+                      }
+                    }}
+                  />
+                );
+              }
+
+              return (
+                <div
+                  key={`pen-${key}-${i}`}
+                  title={`Pending: ${label}`}
+                  style={style}
+                />
+              );
+            })}
+            {Array.from({ length: Math.max(0, unassignedSpots) }).map((_, i) => (
+              <div
+                key={`free-${i}`}
+                title="Unassigned seat"
+                style={{ width: 14, height: 14, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6' }}
+              />
+            ))}
+            {!spotAddOpen && (
+              <button
+                type="button"
+                className="btn btn-outline-secondary p-0 d-flex justify-content-center align-items-center"
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: '50%',
+                  fontWeight: 'bold',
+                  lineHeight: 1,
+                  transform: 'translateY(-2px)'
+                }}
+                onClick={() => onSpotAddToggle(true)}
+                aria-label="Add person"
+              >
+                <span style={{ transform: 'translateY(-2px)', display: 'inline-block' }}>+</span>
+              </button>
             )}
-          </motion.div>
-        ))}
-      </motion.div>
+          </div>
 
-      <MemberConfirmModal
-        open={confirmOpen}
-        onClose={() => setConfirmOpen(false)}
-        member={activeMember}
-        onDone={onChanged}
-      />
-      <GuardianApprovalModal
-        open={guardianOpen}
-        onClose={() => setGuardianOpen(false)}
-        member={activeMember}
-        onDone={onChanged}
-      />
+        </div>
+        <div className="card-footer bg-transparent border-0 pt-0">
+          <div className="d-flex flex-wrap align-items-center gap-2 small text-muted">
+            <span className="d-inline-flex align-items-center gap-1">
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#00ADBB', display: 'inline-block' }}></span>
+              Covered
+            </span>
+            <span className="d-inline-flex align-items-center gap-1">
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#ffc107', display: 'inline-block' }}></span>
+              Pending
+            </span>
+            <span className="d-inline-flex align-items-center gap-1">
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6', display: 'inline-block' }}></span>
+              Paid / Unassigned
+            </span>
+          </div>
+
+          {spotAddOpen && spotAddForm && (
+            <div className="mt-3">
+              {spotAddForm}
+            </div>
+          )}
+      </div>
     </div>
-  )
-}
 
-function MemberInlineEditor({ member, onClose, onSaved }) {
-  function formatPhone(v) {
-    const d = (v || '').replace(/\D/g, '').slice(0, 10)
-    if (d.length <= 3) return d ? `(${d}` : ''
-    if (d.length <= 6) return `(${d.slice(0,3)}) ${d.slice(3)}`
-    return `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`
-  }
-  const [form, setForm] = useState({
-    firstName: member.firstName || '',
-    lastName: member.lastName || '',
-    email: member.email || '',
-    phone: member.phone || '',
-    isMinor: !!member.isMinor,
-    guardianName: member.guardianName || '',
-    guardianEmail: member.guardianEmail || ''
-  })
-  const [saving, setSaving] = useState(false)
-
-  async function save() {
-    setSaving(true)
-    await api.updateMember(member.id, form)
-    setSaving(false)
-    onSaved?.()
-  }
-
-  return (
-    <div className="row g-2">
-      <div className="col-12 col-md-4">
-        <label className="form-label small">First name</label>
-        <input className="form-control"
-          value={form.firstName}
-          onChange={e=>setForm(f=>({ ...f, firstName: e.target.value }))}
-        />
-      </div>
-      <div className="col-12 col-md-4">
-        <label className="form-label small">Last name</label>
-        <input className="form-control"
-          value={form.lastName}
-          onChange={e=>setForm(f=>({ ...f, lastName: e.target.value }))}
-        />
-      </div>
-      <div className="col-12 col-md-4">
-        <label className="form-label small">Phone</label>
-        <input className="form-control"
-          value={form.phone}
-          onChange={e=>setForm(f=>({ ...f, phone: formatPhone(e.target.value) }))}
-        />
-      </div>
-      <div className="col-12 col-md-6">
-        <label className="form-label small">Email</label>
-        <input className="form-control"
-          value={form.email}
-          onChange={e=>setForm(f=>({ ...f, email: e.target.value }))}
-        />
-      </div>
-      <div className="col-12 col-md-3 d-flex align-items-end">
-        <div className="form-check">
-          <input
-            id={`minor-${member.id}`}
-            type="checkbox"
-            className="form-check-input"
-            checked={form.isMinor}
-            onChange={e=>setForm(f=>({ ...f, isMinor: e.target.checked }))}
-          />
-          <label className="form-check-label" htmlFor={`minor-${member.id}`}>Minor</label>
+      <div className="card">
+        <div className="card-body py-2">
+          <div className="input-group input-group-sm">
+            <span className="input-group-text">Search</span>
+            <input
+              type="search"
+              className="form-control"
+              placeholder="Find a traveler…"
+              value={searchTerm}
+              onChange={handleSearchInput}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                className="btn btn-outline-secondary"
+                onClick={clearSearch}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          {searchActive && (
+            <div className="small text-muted mt-2">
+              {totalMatches === 0
+                ? `No travelers match "${searchLabel}"`
+                : `Showing ${totalMatches} match${totalMatches === 1 ? '' : 'es'} for "${searchLabel}"`}
+            </div>
+          )}
         </div>
       </div>
-      {form.isMinor && (
-        <>
-          <div className="col-12 col-md-4">
-            <label className="form-label small">Guardian Name</label>
-            <input className="form-control"
-              value={form.guardianName}
-              onChange={e=>setForm(f=>({ ...f, guardianName: e.target.value }))}
-            />
+
+      <div className="card">
+        <div className="card-header d-flex justify-content-between align-items-start">
+          <div className="d-flex flex-column">
+            <div className="fw-semibold">Ready Roster</div>
+            <div className="text-muted small">Persons covered and ready to go</div>
           </div>
-          <div className="col-12 col-md-4">
-            <label className="form-label small">Guardian Email</label>
-            <input className="form-control"
-              value={form.guardianEmail}
-              onChange={e=>setForm(f=>({ ...f, guardianEmail: e.target.value }))}
-            />
+          <span className="badge" style={{ background: '#00ADBB', color: '#fff' }}>{coveredCount}</span>
+        </div>
+        <div className="card-body p-0">
+          {ready.length === 0 ? (
+            <div className="p-3 text-muted">{readyEmptyText}</div>
+          ) : (
+            ready.map(renderReady)
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header d-flex justify-content-between align-items-start">
+          <div className="d-flex flex-column">
+            <div className="fw-semibold">Pending Coverage</div>
+            <div className="text-muted small">Move your confirmed travelers up</div>
           </div>
-        </>
-      )}
-      <div className="col-12 d-flex gap-2 mt-2">
-        <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-        <button className="btn btn-primary" disabled={saving} onClick={save}>
-          {saving ? 'Saving…' : 'Save'}
-        </button>
+          <span className="badge text-bg-warning">{pendingCount}</span>
+        </div>
+        <div className="card-body p-0">
+          {pending.length === 0 ? (
+            <div className="p-3 text-muted">{pendingEmptyText}</div>
+          ) : (
+            pending.map(renderPending)
+          )}
+        </div>
       </div>
     </div>
   )

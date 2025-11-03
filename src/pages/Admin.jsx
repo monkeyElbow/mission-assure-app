@@ -16,6 +16,11 @@ export default function Admin(){
   const [scope, setScope] = useState('ACTIVE') // ACTIVE | ARCHIVED | ALL
   const [err, setErr] = useState('')
   const [msg, setMsg] = useState('')
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyTrip, setHistoryTrip] = useState(null)
+  const [historyData, setHistoryData] = useState(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(null)
 
   // ---- Rates state ----
   const [rates, setRates] = useState([])
@@ -77,6 +82,49 @@ export default function Admin(){
     setTrips(ts=>ts.map(x=>x.id===t.id? saved : x))
   }
 
+  function closeHistory(){
+    setHistoryOpen(false)
+    setHistoryTrip(null)
+    setHistoryError(null)
+    setHistoryData(null)
+  }
+
+  async function viewHistory(t){
+    setHistoryTrip(t)
+    setHistoryOpen(true)
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const res = await api.getTripHistory?.(t.id)
+        || await api.getTripHistory(t.id)
+      setHistoryData(res)
+    } catch (e) {
+      console.error(e)
+      setHistoryError(e)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  function downloadHistory(){
+    if (!historyData || !historyTrip) return
+    const events = historyData.events || []
+    const rows = events.map(evt => {
+      const ts = evt.timestamp ? new Date(evt.timestamp).toLocaleString() : ''
+      const actor = evt.actor_role ? `${evt.actor_role}${evt.actor_id ? ' · ' + evt.actor_id : ''}` : (evt.actor_id || '—')
+      return `<tr><td>${ts}</td><td>${evt.type || ''}</td><td>${actor}</td><td>${evt.notes || ''}</td></tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Trip History ${historyTrip.shortId || historyTrip.id}</title><style>body{font-family:Helvetica,Arial,sans-serif;margin:24px;}h1{font-size:20px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:6px 8px;font-size:12px;}th{background:#f1f3f5;text-align:left;}</style></head><body><h1>Trip History</h1><p><strong>Trip:</strong> ${historyTrip.title || 'Trip'} (${historyTrip.shortId || historyTrip.id})</p><p><strong>Dates:</strong> ${historyTrip.startDate || '—'} → ${historyTrip.endDate || '—'}</p><table><thead><tr><th style="width:20%">Timestamp</th><th style="width:20%">Event</th><th style="width:20%">Actor</th><th>Notes</th></tr></thead><tbody>${rows || '<tr><td colspan="4">No history events recorded.</td></tr>'}</tbody></table></body></html>`
+
+    const win = window.open('', '_blank')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    win.print()
+  }
+
   // CSV (simple)
   const tripsCSV = useMemo(()=>{
     const rows = trips.map(t=>{
@@ -121,7 +169,7 @@ export default function Admin(){
       {msg && <div className="alert alert-success py-2">{msg}</div>}
 
       {/* ---- Trips section ---- */}
-      <div className="card p-3 mb-4">
+      <div className="card p-3 mb-4 no-hover">
         <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2">
           <h2 className="h5 mb-0">Trips</h2>
           <div className="d-flex gap-2">
@@ -192,26 +240,52 @@ export default function Admin(){
                     </td>
                     <td className="text-end">
                       <div className="btn-group btn-group-sm">
-                        <Link to={`/trips/${t.id}`} className="btn btn-outline-secondary">Open</Link>
+                        <Link
+                          to={`/trips/${t.id}`}
+                          className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                        >
+                          Open
+                        </Link>
+                        <button
+                          className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                          onClick={()=>viewHistory(t)}
+                        >
+                          History
+                        </button>
                         {t.paymentStatus!=='PAID' && (
-                          <button className="btn btn-outline-success" onClick={()=>markPaid(t)}>Mark Paid</button>
+                          <button
+                            className="btn btn-outline-success d-flex align-items-center justify-content-center"
+                            onClick={()=>markPaid(t)}
+                          >
+                            Mark Paid
+                          </button>
                         )}
                         {t.status==='ARCHIVED' ? (
-                          <button className="btn btn-outline-primary" onClick={()=>unarchive(t)}>Unarchive</button>
-                        ) : (
-                          <button className="btn btn-outline-secondary" onClick={()=>archive(t)}>Archive</button>
-                        )}
                           <button
-    className="btn btn-outline-danger"
-    onClick={async ()=>{
-      if (!confirm(`Delete trip "${t.title}" (${t.shortId||t.id})? This removes its members${/* and claims */''}.`)) return;
-      await api.deleteTrip(t.id);
-      setTrips(ts => ts.filter(x => x.id !== t.id));
-      setMembersByTrip(m => { const { [t.id]:_, ...rest } = m; return rest; });
-    }}
-    >
-    Delete
-  </button>
+                            className="btn btn-outline-primary d-flex align-items-center justify-content-center"
+                            onClick={()=>unarchive(t)}
+                          >
+                            Unarchive
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                            onClick={()=>archive(t)}
+                          >
+                            Archive
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-outline-danger d-flex align-items-center justify-content-center"
+                          onClick={async ()=>{
+                            if (!confirm(`Delete trip "${t.title}" (${t.shortId||t.id})? This removes its members.`)) return;
+                            await api.deleteTrip(t.id);
+                            setTrips(ts => ts.filter(x => x.id !== t.id));
+                            setMembersByTrip(m => { const { [t.id]:_, ...rest } = m; return rest; });
+                          }}
+                        >
+                          Delete
+                        </button>
                       </div>
                     </td>
 
@@ -229,7 +303,7 @@ export default function Admin(){
       </div>
 
       {/* ---- Rates Manager ---- */}
-      <div className="card p-3 mb-4">
+      <div className="card p-3 mb-4 no-hover">
         <div className="d-flex justify-content-between align-items-center mb-2">
           <h2 className="h5 mb-0">Rates</h2>
         </div>
@@ -285,7 +359,7 @@ export default function Admin(){
       </div>
 
       {/* ---- Reports ---- */}
-      <div className="card p-3">
+      <div className="card p-3 no-hover">
         <div className="d-flex align-items-center justify-content-between">
           <h2 className="h5 mb-0">Reports</h2>
           <button className="btn btn-outline-secondary btn-sm"
@@ -295,6 +369,69 @@ export default function Admin(){
         </div>
         <p className="text-muted mt-2 mb-0">Exports a simple trips summary. Member-level CSV can be added next.</p>
       </div>
+      {historyOpen && (
+        <>
+          <div className="modal fade show" style={{ display:'block' }} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-lg modal-dialog-scrollable">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Trip History</h5>
+                  <button type="button" className="btn-close" onClick={closeHistory}></button>
+                </div>
+                <div className="modal-body">
+                  {historyLoading && <div className="py-4 text-center">Loading history…</div>}
+                  {!historyLoading && historyError && (
+                    <div className="alert alert-danger">{historyError?.message || 'Unable to load history.'}</div>
+                  )}
+                  {!historyLoading && !historyError && historyData && historyTrip && (
+                    <>
+                      <div className="mb-3 small text-muted">
+                        <div><strong>Trip:</strong> {historyTrip.title || 'Trip'} ({historyTrip.shortId || historyTrip.id})</div>
+                        <div><strong>Dates:</strong> {historyTrip.startDate || '—'} → {historyTrip.endDate || '—'}</div>
+                        <div><strong>Region:</strong> {historyTrip.region || '—'}</div>
+                        <div><strong>Status:</strong> {historyTrip.status || '—'}</div>
+                      </div>
+                      <div className="table-responsive">
+                        <table className="table table-sm align-middle">
+                          <thead>
+                            <tr>
+                              <th style={{width:'20%'}}>Timestamp</th>
+                              <th style={{width:'20%'}}>Event</th>
+                              <th style={{width:'20%'}}>Actor</th>
+                              <th>Notes</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(historyData.events || []).length === 0 ? (
+                              <tr><td colSpan={4} className="text-muted">No history recorded.</td></tr>
+                            ) : (
+                              historyData.events.map(evt => (
+                                <tr key={evt.event_id || evt.timestamp}>
+                                  <td>{evt.timestamp ? new Date(evt.timestamp).toLocaleString() : '—'}</td>
+                                  <td>{evt.type || '—'}</td>
+                                  <td>{evt.actor_role ? `${evt.actor_role}${evt.actor_id ? ' · ' + evt.actor_id : ''}` : (evt.actor_id || '—')}</td>
+                                  <td>{evt.notes || ''}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  {!historyLoading && !historyError && historyData && (
+                    <button className="btn btn-outline-secondary btn-sm" onClick={downloadHistory}>Download PDF</button>
+                  )}
+                  <button className="btn btn-primary btn-sm" onClick={closeHistory}>Close</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={closeHistory}></div>
+        </>
+      )}
     </div>
   )
 }

@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../data/api.local.js'
-import TripMembersList from '../components/trip/TripMembersList.jsx'
 import TripMemberAddForm from '../components/trip/TripMemberAddForm.jsx'
 
 
@@ -453,7 +452,6 @@ function escapeHtml(s="") {
         <TripMemberAddForm tripId={trip.id} onAdded={load} />
       </div>
     )}
-          <TripMembersList trip={trip} members={trip.members} onChanged={load} />
         </div>
         
       </div>
