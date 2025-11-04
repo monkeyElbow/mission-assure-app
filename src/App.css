@@ -120,6 +120,83 @@ footer a:hover {
 .agf1{
   color: var(--agf1);
 }
+.status-panel{
+  border-left: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid rgba(0,0,0,0.08);
+  background: #f8fafb;
+  border-radius: 8px;
+}
+
+.archived-card{
+  background: rgba(0,0,0,0.05) !important;
+}
+
+.status-panel .status-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(0,0,0,0.9);
+  text-align: center;
+}
+
+.claims-table thead th{
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.6);
+}
+
+.claims-id{
+  font-size: 0.75rem;
+}
+
+.claims-copy{
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.claims-copy:hover{
+  text-decoration: underline;
+}
+
+.admin-table th{
+  font-size: 0.8rem;
+}
+
+.admin-table .fw-medium > a{
+  font-weight: 600;
+}
+
+.admin-table .smaller{
+  font-size: 0.75rem;
+}
+
+.btn-group.btn-group-sm > .btn,
+.btn-group.btn-group-sm > .btn-group > .btn{
+  border-width: 1px !important;
+}
+
+.btn-group.btn-group-sm > .btn + .btn,
+.btn-group.btn-group-sm > .btn + .btn-group,
+.btn-group.btn-group-sm > .btn-group + .btn,
+.btn-group.btn-group-sm > .btn-group + .btn-group{
+  margin-left: -1px;
+  border-left-width: 1px;
+}
+
+@media (max-width: 767px){
+  .status-panel{
+    border-left: none;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    margin-top: 12px;
+  }
+  .status-panel .status-label{
+    text-align: left;
+  }
+}
 .agf2{
   color: var(--agf2);
 }

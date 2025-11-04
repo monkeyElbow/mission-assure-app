@@ -214,12 +214,11 @@ useEffect(()=>{
         </div>
 
         <div className="table-responsive">
-          <table className="table table-sm align-middle mb-0">
+          <table className="table table-sm align-middle mb-0 admin-table">
             <thead>
               <tr>
                 <th>Trip</th>
                 <th>Dates</th>
-                <th>Region</th>
                 <th>Members</th>
                 <th>Payment</th>
                 <th>Status</th>
@@ -236,16 +235,18 @@ useEffect(()=>{
                     <td>
                       <div className="fw-medium">
                         <Link to={`/trips/${t.id}`} className="text-decoration-none">{t.title}</Link>
-                        {t.shortId && <span className="text-muted small ms-2">#{t.shortId}</span>}
+                        {t.shortId && <span className="text-muted smaller ms-2">#{t.shortId}</span>}
                       </div>
-                      <div className="text-muted small">Rate ${ (t.rateCents/100).toFixed(2) }/day</div>
+                      <div className="text-muted small d-flex align-items-center gap-2">
+                        <span className="badge text-bg-light small">{t.region}</span>
+                        <span>Rate ${ (t.rateCents/100).toFixed(2) }/day</span>
+                      </div>
                     </td>
                     <td className="small">
                       {t.startDate} → {t.endDate}
                       <div className="text-muted">{days} days</div>
                     </td>
-                    <td><span className="badge text-bg-light">{t.region}</span></td>
-                    <td>{membersByTrip[t.id] || 0}</td>
+                    <td className="text-center">{membersByTrip[t.id] || 0}</td>
                     <td>
                       <span className={`badge ${t.paymentStatus==='PAID' ? 'bg-agf2 text-white' : 'bg-melon'}`}>
                         {t.paymentStatus}
@@ -254,7 +255,7 @@ useEffect(()=>{
                     <td>
                       {t.status==='ARCHIVED'
                         ? <span className="badge text-bg-secondary">ARCHIVED</span>
-                        : <span className="badge text-bg-primary-subtle text-primary">ACTIVE</span>}
+                        : <span className="badge text-bg-primary-subtle" style={{ color: 'var(--agf2)' }}>ACTIVE</span>}
                     </td>
                     <td className="text-end">
                       <div className="btn-group btn-group-sm">

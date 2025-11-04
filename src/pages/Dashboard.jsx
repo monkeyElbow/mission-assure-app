@@ -59,35 +59,41 @@ function TripCard({ t, meta = {} }) {
   } = meta;
 
   const days = daysInclusive(t.startDate, t.endDate) || 0;
-  const perDay = (t.rateCents / 100).toFixed(2);
+  const isArchived = t.status === 'ARCHIVED';
 
   return (
-        <motion.div className="h-100" layout>
-
-          
-    <Card className="p-4 h-100">
-          <h2 className="h4 mb-1">
-            {t.title} 
-          </h2>
-      <Row>
-        <Col md={8}>
-          <p className='fw-bold small fs-5 lh-sm'>
-            {t.shortId && <span className="text-muted small">#{t.shortId}</span>}
-          </p>
-          <div className="badge bg-dark mb-2">{t.region}</div>
-        
-      <div className="d-flex justify-content-between align-items-start">
-        <div>
-          <div className="small text-muted">
-            {t.startDate} → {t.endDate} • {days} days • {confirmedCount}/{memberCount} confirmed • ${perDay}/day
-          </div>
-        </div>
-
-      </div>
-        </Col>
-        <Col  className='d-flex flex-column justify-content-right gap-1 p-2'>
-        
-            {status === 'DUE' && (
+    <motion.div className="h-100" layout>
+      <Card className={`p-4 h-100 ${isArchived ? 'archived-card' : ''}`}>
+        <h2 className="h4 mb-3">{t.title}</h2>
+        <Row className="g-3 align-items-start">
+          <Col md={8} className="d-flex flex-column gap-2">
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              {t.shortId && <span className="fw-semibold text-muted small">#{t.shortId}</span>}
+              <span className="badge bg-dark small">{t.region}</span>
+            </div>
+            <div className="small text-muted lh-sm d-flex align-items-center gap-2 flex-wrap">
+              <span>{t.startDate} → {t.endDate}</span>
+              <span className="badge bg-light text-dark border">{days} days</span>
+            </div>
+            <div className="small text-muted lh-sm">
+              <span
+                className="badge bg-light fw-semibold"
+                style={{ color: 'var(--agf1)', border: '1px solid var(--agf1)' }}
+              >
+                {confirmedCount}/{memberCount} confirmed
+              </span>
+            </div>
+            <div className="d-flex gap-2 mt-2">
+              <Link to={`/trips/${t.id}`} className="btn btn-sm btn-primary stretched-link">
+                Open
+              </Link>
+            </div>
+          </Col>
+          <Col md={4} className="d-flex">
+            <div className="status-panel w-100 d-flex flex-column flex-grow-1 gap-2 px-3 py-2">
+              <span className="text-uppercase small status-label text-muted">Status</span>
+              <div className="d-flex flex-column gap-2 mt-1">
+            {!isArchived && status === 'DUE' && (
               <motion.span
               key="due"
               className="badge bg-melon text-dark"
@@ -99,7 +105,7 @@ function TripCard({ t, meta = {} }) {
                 Pay {cents(balanceDueCents)}
               </motion.span>
             )}
-            {status === 'READY' && (
+            {!isArchived && status === 'READY' && (
               <motion.span
               key="ready"
               className="badge bg-agf1"
@@ -112,19 +118,7 @@ function TripCard({ t, meta = {} }) {
               </motion.span>
             )}
           <AnimatePresence>
-            {status === 'SETUP' && (
-              <motion.span
-              key="setup"
-              className="badge text-bg-secondary"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              >
-                Confirm people
-              </motion.span>
-            )}
-            {unconfirmedCount > 0 && (
+            {!isArchived && unconfirmedCount > 0 && (
               <motion.span
               key={`unconf-${unconfirmedCount}`}
               className="badge bg-melon"
@@ -138,21 +132,17 @@ function TripCard({ t, meta = {} }) {
             )}
           </AnimatePresence>
 
-          {t.status === 'ARCHIVED' && (
-            <span className="badge text-bg-secondary">ARCHIVED</span>
-          )}
-        </Col>
-      </Row>
+            {isArchived && (
+              <span className="badge text-bg-secondary">ARCHIVED</span>
+            )}
+              </div>
+            </div>
+          </Col>
+        </Row>
 
-      <div className="d-flex gap-2 mt-3">
-        <Link to={`/trips/${t.id}`} className="btn btn-sm btn-primary stretched-link">
-          Open
-        </Link>
-      </div>
-    </Card>
-          
-
-        </motion.div>
+        
+      </Card>
+    </motion.div>
   );
 }
 
