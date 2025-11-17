@@ -9,12 +9,6 @@
   --gray:#76787B;
   --dark:#414042;
   --sand:#C4BEB6;
-
-/* 
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center; */
 }
 
 footer #text,
@@ -350,4 +344,39 @@ footer a:hover {
 /* Optional stagger per field using a CSS var set inline */
 .minor-field {
   transition-delay: var(--d, 0ms);
+}
+
+/* Tour helpers */
+.tour-callout {
+  border: 1px dashed var(--agf1);
+  padding: 12px;
+  border-radius: 12px;
+  position: relative;
+}
+
+.tour-flyout {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  max-width: 320px;
+  z-index: 5;
+}
+
+.tour-dim {
+  opacity: 0.35;
+  filter: grayscale(0.25);
+  pointer-events: none;
+}
+
+.tour-focus {
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 768px) {
+  .tour-flyout {
+    position: static;
+    max-width: 100%;
+    margin-top: 8px;
+  }
 }

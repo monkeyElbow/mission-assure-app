@@ -7,6 +7,7 @@ import App from './App.jsx'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import './app.css'
+import { TourProvider } from './core/TourContext.jsx'
 
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 
@@ -24,7 +25,9 @@ initLocalApi()
     root.render(
       <React.StrictMode>
         <BrowserRouter>
-          <App />
+          <TourProvider>
+            <App />
+          </TourProvider>
         </BrowserRouter>
       </React.StrictMode>
     )

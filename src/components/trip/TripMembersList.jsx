@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useState } from 'react'
+import TourCallout from '../tour/TourCallout.jsx'
 
 export default function TripMembersList({
   ready = [],
@@ -17,7 +18,13 @@ export default function TripMembersList({
   searchActive = false,
   onMemberFocus,
   renderReadyItem,
-  renderPendingItem
+  renderPendingItem,
+  tourActiveStep = null,
+  tourStepLabel = '',
+  tourStepIndex = 0,
+  tourStepTotal = 0,
+  onTourDismiss = () => {},
+  onTourTurnOff = () => {}
 }) {
   const renderReady = renderReadyItem || (() => null);
   const renderPending = renderPendingItem || (() => null);
@@ -40,6 +47,11 @@ export default function TripMembersList({
 
   const readyEmptyText = searchActive ? 'No ready travelers match your search.' : 'No covered travelers yet.';
   const pendingEmptyText = searchActive ? 'No pending travelers match your search.' : 'No pending travelers.';
+  const stepLabel = tourStepLabel || (tourStepIndex ? `Step ${tourStepIndex} of ${tourStepTotal || tourStepIndex}` : '');
+  const sectionClass = (key) => (tourActiveStep ? (tourActiveStep === key ? 'tour-focus' : 'tour-dim') : '');
+  const [spotTip, setSpotTip] = useState(false);
+  const [readyTip, setReadyTip] = useState(false);
+  const [pendingTip, setPendingTip] = useState(false);
 
   return (
     <div className="d-flex flex-column gap-3">
@@ -49,107 +61,128 @@ export default function TripMembersList({
         </div>
       )}
 
-      <div className="card">
-        <div className="card-header fw-semibold bg-agf1 text-white">Spot Overview</div>
-        <div className="card-body pb-2">
-          <div
-            className="d-grid"
-            style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(14px,1fr))', gap: 4, padding: '6px 0' }}
+      <div className={`card position-relative ${sectionClass('spotOverview')}`}>
+        <div className="card-header fw-semibold bg-agf1 text-white d-flex justify-content-between align-items-center">
+          <span>Spot Overview</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-link text-white text-decoration-none p-0"
+            onClick={() => setSpotTip(v => !v)}
+            aria-label="Toggle spot overview tip"
           >
-            {overviewReady.map((m, i) => {
-              const label = labelForMember(m);
-              const quickLabel = label.trim();
-              const key = m.member_id ?? m.id ?? i;
-              const isMatch = readyMatchIds.has(String(m.member_id ?? m.id ?? ''));
-              const handleActivate = () => onMemberFocus?.(quickLabel);
-              const style = {
-                width: 14,
-                height: 14,
-                borderRadius: 3,
-                backgroundColor: '#00ADBB',
-                border: 'none',
-                cursor: onMemberFocus ? 'pointer' : 'default',
-                opacity: searchActive && !isMatch ? 0.25 : 1
-              };
+            ?
+          </button>
+        </div>
+        <div className="card-body pb-2">
+          {spotTip ? (
+            <TourCallout
+              title="Spot overview"
+              description="Blue squares are covered travelers, yellow are pending, and empty squares are paid seats waiting to assign."
+              stepLabel={stepLabel}
+              onDismiss={() => setSpotTip(false)}
+              dismissLabel="Close"
+              showTurnOff={false}
+            />
+          ) : (
+            <div
+              className="d-grid"
+              style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(14px,1fr))', gap: 4, padding: '6px 0' }}
+            >
+              {overviewReady.map((m, i) => {
+                const label = labelForMember(m);
+                const quickLabel = label.trim();
+                const key = m.member_id ?? m.id ?? i;
+                const isMatch = readyMatchIds.has(String(m.member_id ?? m.id ?? ''));
+                const handleActivate = () => onMemberFocus?.(quickLabel);
+                const style = {
+                  width: 14,
+                  height: 14,
+                  borderRadius: 3,
+                  backgroundColor: '#00ADBB',
+                  border: 'none',
+                  cursor: onMemberFocus ? 'pointer' : 'default',
+                  opacity: searchActive && !isMatch ? 0.25 : 1
+                };
 
-              if (onMemberFocus) {
+                if (onMemberFocus) {
+                  return (
+                    <div
+                      key={`cov-${key}-${i}`}
+                      title={`Covered: ${label}`}
+                      role="button"
+                      tabIndex={0}
+                      style={style}
+                      onClick={handleActivate}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleActivate();
+                        }
+                      }}
+                    />
+                  );
+                }
+
                 return (
                   <div
                     key={`cov-${key}-${i}`}
                     title={`Covered: ${label}`}
-                    role="button"
-                    tabIndex={0}
                     style={style}
-                    onClick={handleActivate}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        handleActivate();
-                      }
-                    }}
                   />
                 );
-              }
+              })}
+              {overviewPending.map((m, i) => {
+                const label = labelForMember(m);
+                const quickLabel = label.trim();
+                const key = m.member_id ?? m.id ?? i;
+                const isMatch = pendingMatchIds.has(String(m.member_id ?? m.id ?? ''));
+                const handleActivate = () => onMemberFocus?.(quickLabel);
+                const style = {
+                  width: 14,
+                  height: 14,
+                  borderRadius: 3,
+                  backgroundColor: '#ffc107',
+                  border: 'none',
+                  cursor: onMemberFocus ? 'pointer' : 'default',
+                  opacity: searchActive && !isMatch ? 0.25 : 1
+                };
 
-              return (
-                <div
-                  key={`cov-${key}-${i}`}
-                  title={`Covered: ${label}`}
-                  style={style}
-                />
-              );
-            })}
-            {overviewPending.map((m, i) => {
-              const label = labelForMember(m);
-              const quickLabel = label.trim();
-              const key = m.member_id ?? m.id ?? i;
-              const isMatch = pendingMatchIds.has(String(m.member_id ?? m.id ?? ''));
-              const handleActivate = () => onMemberFocus?.(quickLabel);
-              const style = {
-                width: 14,
-                height: 14,
-                borderRadius: 3,
-                backgroundColor: '#ffc107',
-                border: 'none',
-                cursor: onMemberFocus ? 'pointer' : 'default',
-                opacity: searchActive && !isMatch ? 0.25 : 1
-              };
+                if (onMemberFocus) {
+                  return (
+                    <div
+                      key={`pen-${key}-${i}`}
+                      title={`Pending: ${label}`}
+                      role="button"
+                      tabIndex={0}
+                      style={style}
+                      onClick={handleActivate}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleActivate();
+                        }
+                      }}
+                    />
+                  );
+                }
 
-              if (onMemberFocus) {
                 return (
                   <div
                     key={`pen-${key}-${i}`}
                     title={`Pending: ${label}`}
-                    role="button"
-                    tabIndex={0}
                     style={style}
-                    onClick={handleActivate}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        handleActivate();
-                      }
-                    }}
                   />
                 );
-              }
-
-              return (
+              })}
+              {Array.from({ length: Math.max(0, unassignedSpots) }).map((_, i) => (
                 <div
-                  key={`pen-${key}-${i}`}
-                  title={`Pending: ${label}`}
-                  style={style}
+                  key={`free-${i}`}
+                  title="Unassigned seat"
+                  style={{ width: 14, height: 14, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6' }}
                 />
-              );
-            })}
-            {Array.from({ length: Math.max(0, unassignedSpots) }).map((_, i) => (
-              <div
-                key={`free-${i}`}
-                title="Unassigned seat"
-                style={{ width: 14, height: 14, borderRadius: 3, background: '#fff', border: '1px solid #dee2e6' }}
-              />
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
         </div>
         <div className="card-footer bg-transparent border-0 pt-0">
@@ -191,6 +224,16 @@ export default function TripMembersList({
               {spotAddForm}
             </div>
           )}
+          {tourActiveStep === 'spotOverview' && (
+            <TourCallout
+              className="tour-flyout"
+              title="Start with the spot overview"
+              description="Each square represents a traveler—blue is covered, yellow is pending, and empty squares are paid seats you can assign next."
+              stepLabel={stepLabel}
+              onDismiss={() => onTourDismiss('spotOverview')}
+              onTurnOff={onTourTurnOff}
+            />
+          )}
       </div>
     </div>
 
@@ -225,38 +268,100 @@ export default function TripMembersList({
         </div>
       </div>
 
-      <div className="card">
+      <div className={`card position-relative ${sectionClass('readyRoster')}`}>
         <div className="card-header d-flex justify-content-between align-items-start bg-agf2 text-white">
           <div className="d-flex flex-column">
             <div className="fw-semibold h5">Ready Roster</div>
             <div className="small text-white">Persons covered and ready to go</div>
           </div>
-          <span className="badge bg-agf1 text-white">{coveredCount}</span>
+          <div className="d-flex align-items-center gap-2">
+            <span className="badge bg-agf1 text-white">{coveredCount}</span>
+            <button
+              type="button"
+              className="btn btn-sm btn-link text-white text-decoration-none p-0"
+              onClick={() => setReadyTip(v => !v)}
+              aria-label="Toggle ready roster tip"
+            >
+              ?
+            </button>
+          </div>
         </div>
         <div className="card-body p-0">
-          {ready.length === 0 ? (
+          {readyTip ? (
+            <div className="p-3">
+              <TourCallout
+                title="Ready roster"
+                description="Covered travelers appear here. Edit, release seats, or open a traveler to adjust their guardian or confirmation status."
+                stepLabel={stepLabel}
+                onDismiss={() => setReadyTip(false)}
+                dismissLabel="Close"
+                showTurnOff={false}
+              />
+            </div>
+          ) : ready.length === 0 ? (
             <div className="p-3 text-muted">{readyEmptyText}</div>
           ) : (
             ready.map(renderReady)
           )}
         </div>
+        {tourActiveStep === 'readyRoster' && (
+          <TourCallout
+            className="tour-flyout"
+            title="Ready roster"
+            description="Covered travelers appear here. Edit, release seats, or open a traveler to adjust their guardian or confirmation status."
+            stepLabel={stepLabel}
+            onDismiss={() => onTourDismiss('readyRoster')}
+            onTurnOff={onTourTurnOff}
+          />
+        )}
       </div>
 
-      <div className="card">
+      <div className={`card position-relative ${sectionClass('pendingCoverage')}`}>
         <div className="card-header d-flex justify-content-between align-items-start bg-mango">
           <div className="d-flex flex-column">
             <div className="fw-semibold h5">Pending Coverage</div>
             <div className="text-muted small">Travelers are moved to ready once confirmed</div>
           </div>
-          <span className="badge bg-dark">{pendingCount}</span>
+          <div className="d-flex align-items-center gap-2">
+            <span className="badge bg-dark">{pendingCount}</span>
+            <button
+              type="button"
+              className="btn btn-sm btn-link text-dark text-decoration-none p-0"
+              onClick={() => setPendingTip(v => !v)}
+              aria-label="Toggle pending coverage tip"
+            >
+              ?
+            </button>
+          </div>
         </div>
         <div className="card-body p-0">
-          {pending.length === 0 ? (
+          {pendingTip ? (
+            <div className="p-3">
+              <TourCallout
+                title="Pending coverage"
+                description="These travelers still need confirmation or guardian approval. Once they’re eligible, assign an open seat to move them to Ready."
+                stepLabel={stepLabel}
+                onDismiss={() => setPendingTip(false)}
+                dismissLabel="Close"
+                showTurnOff={false}
+              />
+            </div>
+          ) : pending.length === 0 ? (
             <div className="p-3 text-muted">{pendingEmptyText}</div>
           ) : (
             pending.map(renderPending)
           )}
         </div>
+        {tourActiveStep === 'pendingCoverage' && (
+          <TourCallout
+            className="tour-flyout"
+            title="Pending coverage"
+            description="These travelers still need confirmation or guardian approval. Once they’re eligible, assign an open seat to move them to Ready."
+            stepLabel={stepLabel}
+            onDismiss={() => onTourDismiss('pendingCoverage')}
+            onTurnOff={onTourTurnOff}
+          />
+        )}
       </div>
     </div>
   )

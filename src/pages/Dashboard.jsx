@@ -1,13 +1,15 @@
 // src/pages/Dashboard.jsx
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { api, seedDemoIfEmpty } from '../data/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../data/api';
 import { daysInclusive } from '../core/pricing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeSlide } from '../ui/motion';
 import DashSearch from '../components/DashSearch';
 import { Container, Card, Row, Col } from 'react-bootstrap';
 import AppLogoIntro from '../ui/AppLogoIntro';
+import { useTour } from '../core/TourContext.jsx';
+import TourCallout from '../components/tour/TourCallout.jsx';
 
 // ---- helpers ----
 const cents = (n = 0) =>
@@ -148,13 +150,16 @@ function TripCard({ t, meta = {} }) {
 
 // ---- page ----
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [trips, setTrips] = useState([]);
   const [metaByTrip, setMetaByTrip] = useState({});
   const [filter, setFilter] = useState('ACTIVE'); // ACTIVE | ARCHIVED | ALL
+  const tour = useTour();
+  const { enabled: tourOn, steps: tourSteps, enableTour, disableTour, completeStep, stepOrder } = tour;
+  const tourStepLabel = stepOrder ? `Step ${stepOrder.indexOf('dashboardIntro') + 1} of ${stepOrder.length}` : '';
 
   useEffect(() => {
-    seedDemoIfEmpty();
     (async () => {
       const ts = await api.listTrips();
       setTrips(ts);
@@ -206,10 +211,15 @@ export default function Dashboard() {
 
   // empty state helper
   const list = Array.isArray(filtered) ? filtered : Array.isArray(trips) ? trips : [];
+  const dashboardStepOpen = tourOn && !tourSteps.dashboardIntro;
 
 // logo intro animation
 const [introDone, setIntroDone] = useState(false);
 const handleIntroDone = useCallback(() => setIntroDone(true), []);
+const handleTourToggle = useCallback((checked) => {
+  if (checked) enableTour(true);
+  else disableTour();
+}, [enableTour, disableTour]);
 
   return (
 
@@ -223,7 +233,27 @@ const handleIntroDone = useCallback(() => setIntroDone(true), []);
     <Container>
       <div className="d-flex align-items-center justify-content-between my-3">
         <h1 className="h3 mb-0">Leader Dashboard</h1>
-        <Link to="/trips/new" className="btn btn-primary">Create Trip</Link>
+        <div className="d-flex align-items-center gap-3">
+          <div className="form-check form-switch mb-0 small">
+            <input
+              className="form-check-input"
+              type="checkbox"
+              id="tourToggle"
+              checked={tourOn}
+              onChange={(e) => handleTourToggle(e.target.checked)}
+            />
+            <label className="form-check-label" htmlFor="tourToggle">Tour mode</label>
+          </div>
+          <Link
+            to="/trips/new"
+            className="btn btn-primary"
+            onClick={() => {
+              if (dashboardStepOpen) completeStep('dashboardIntro');
+            }}
+          >
+            Create Trip
+          </Link>
+        </div>
       </div>
 
       <DashSearch value={q} onChange={setQ} />
@@ -252,7 +282,22 @@ const handleIntroDone = useCallback(() => setIntroDone(true), []);
 
       {list.length === 0 ? (
         <div className="card p-3">
-          <p className="text-muted mb-0">No trips in this view.</p>
+          {dashboardStepOpen ? (
+            <TourCallout
+              title="Add your first trip"
+              description="Start by creating a trip. We’ll walk you through payments, claims, and rosters next."
+              stepLabel={tourStepLabel}
+              actionLabel="Create trip"
+              onAction={() => {
+                completeStep('dashboardIntro');
+                navigate('/trips/new');
+              }}
+              onDismiss={() => completeStep('dashboardIntro')}
+              onTurnOff={disableTour}
+            />
+          ) : (
+            <p className="text-muted mb-0">No trips in this view.</p>
+          )}
         </div>
       ) : (
         <div className="row g-3">

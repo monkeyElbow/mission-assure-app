@@ -481,33 +481,111 @@ function nextTripShortId(){
     const seq = (store.all('trips').length + 1).toString().padStart(6, '0');
     return `MA-${y}-${seq}`;
   }
-  
 
-// quick demo seeding
-export function seedDemoIfEmpty(){
-  seedRatesIfEmpty();
-  if (store.all(T_TRIPS).length === 0) {
-    const trip = store.insert(T_TRIPS, {
-      title: 'Summer Missions',
-      leaderId: 'demo-leader',
-      startDate: '2025-07-10',
-      endDate: '2025-07-18',
-      region: 'DOMESTIC',
-      rateCents: 125, // snapshot
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
-    ['Ana','Ben','Chris','Dana'].forEach(n=>{
-      store.insert(T_MEMBERS, {
-        tripId: trip.id,
-        firstName: n,
-        lastName: 'Ray',
-        email: `${n.toLowerCase()}@demo.io`,
-        status: 'IN_PROGRESS'
-      });
-    });
+// Demo trip templates and seeding util (reused by admin + legacy seed)
+const DEMO_TRIPS = [
+  {
+    title: 'Serve St. Louis',
+    region: 'DOMESTIC',
+    startDate: '2025-06-05',
+    endDate: '2025-06-12',
+    paymentStatus: 'PAID',
+    coverSpots: 2,
+    members: [
+      { first_name: 'Sam', last_name: 'Lopez', email: 'sam@example.com', confirmed: true, active: true },
+      { first_name: 'Jordan', last_name: 'Kim', email: 'jordan@example.com', confirmed: true, active: true },
+      { first_name: 'Lee', last_name: 'Nguyen', email: 'lee@example.com', confirmed: false, active: true },
+      { first_name: 'Taylor', last_name: 'Bennett', email: 'taylor@example.com', confirmed: false, active: true }
+    ]
+  },
+  {
+    title: 'Guatemala Outreach',
+    region: 'INTERNATIONAL',
+    startDate: '2025-08-02',
+    endDate: '2025-08-12',
+    paymentStatus: 'PAID',
+    coverSpots: 3,
+    members: [
+      { first_name: 'Marisol', last_name: 'Garcia', email: 'marisol@example.com', confirmed: true, active: true },
+      { first_name: 'Caleb', last_name: 'Walker', email: 'caleb@example.com', confirmed: true, active: true },
+      { first_name: 'Ivy', last_name: 'Allen', email: 'ivy@example.com', confirmed: false, active: true },
+      { first_name: 'Noah', last_name: 'Wheeler', email: 'noah@example.com', is_minor: true, guardianApproved: true, guardian_email: 'guardian.noah@example.com' }
+    ]
+  },
+  {
+    title: 'College Retreat',
+    region: 'DOMESTIC',
+    startDate: '2025-10-18',
+    endDate: '2025-10-21',
+    paymentStatus: 'UNPAID',
+    coverSpots: 1,
+    members: [
+      { first_name: 'Riley', last_name: 'Morgan', email: 'riley@example.com', confirmed: true, active: true },
+      { first_name: 'Sky', last_name: 'Patel', email: 'sky@example.com', confirmed: false, active: true }
+    ]
   }
+];
+
+const demoTitleKey = (s = '') => String(s || '').trim().toLowerCase();
+
+async function runDemoSeed({ force = false, onlyWhenEmpty = false } = {}) {
+  seedRatesIfEmpty();
+  const existingTrips = store.all(T_TRIPS);
+  if (onlyWhenEmpty && existingTrips.length > 0) {
+    return { added: 0, total: existingTrips.length };
+  }
+
+  const existingKeys = new Set(existingTrips.map(t => demoTitleKey(t.title)));
+  let added = 0;
+
+  for (const tmpl of DEMO_TRIPS) {
+    const key = demoTitleKey(tmpl.title);
+    if (existingKeys.has(key)) continue;
+    if (!force && !onlyWhenEmpty && existingKeys.has(key)) continue;
+
+    const trip = await api.createTrip({
+      title: tmpl.title,
+      region: tmpl.region,
+      startDate: tmpl.startDate,
+      endDate: tmpl.endDate
+    });
+
+    const spotPrice = computeSpotPriceCents(trip);
+    const seatsToCover = Math.max(0, tmpl.coverSpots || 0);
+    const creditsNeeded = Math.max(0, spotPrice * seatsToCover);
+    if (creditsNeeded > 0) {
+      await api.applyPayment(trip.id, creditsNeeded, { autoAllocate: false });
+    }
+
+    let members = [];
+    if (Array.isArray(tmpl.members) && tmpl.members.length) {
+      members = await api.addMembers(trip.id, tmpl.members);
+    }
+
+    const confirmedMembers = members.filter(m => {
+      const flags = memberFlags(m);
+      return flags.isMinor ? flags.guardianApproved : flags.confirmed;
+    });
+
+    for (const m of confirmedMembers.slice(0, seatsToCover || confirmedMembers.length)) {
+      try {
+        await api.allocateCoverage(trip.id, m.id);
+      } catch (err) {
+        console.warn('Demo coverage allocation failed', err);
+      }
+    }
+
+    await api.updateTrip(trip.id, {
+      paymentStatus: tmpl.paymentStatus || (creditsNeeded > 0 ? 'PAID' : 'UNPAID'),
+      status: tmpl.status || 'ACTIVE',
+      isDemo: true
+    });
+
+    existingKeys.add(key);
+    added += 1;
+  }
+
+  return { added, total: store.all(T_TRIPS).length };
 }
 
 export const api = {
@@ -998,9 +1076,22 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     });
 
     return summaryForTrip(trip);
+  },
+
+  async populateDemoContent(options = {}) {
+    return runDemoSeed({ force: true, ...options });
   }
 
 };
+
+// Demo helpers (legacy + admin action)
+export async function seedDemoIfEmpty() {
+  return runDemoSeed({ onlyWhenEmpty: true });
+}
+
+export async function populateDemoContent(options = {}) {
+  return runDemoSeed({ force: true, ...options });
+}
 
 // ===== One-time seeding of coverage spots from existing trips & members =====
 export async function seedCoverageIfNeeded(){

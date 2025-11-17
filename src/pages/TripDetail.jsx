@@ -10,6 +10,8 @@ import { listClaims } from '../core/claims.js'
 import MemberConfirmModal from '../components/trip/MemberConfirmModal.jsx'
 import GuardianApprovalModal from '../components/trip/GuardianApprovalModal.jsx'
 import { coverageSummary } from '/src/core/coverage'
+import { useTour } from '../core/TourContext.jsx'
+import TourCallout from '../components/tour/TourCallout.jsx'
 
 
 // === helpers (module scope) ===
@@ -624,12 +626,19 @@ const [ready, setReady] = useState([]);
 const [pending, setPending] = useState([]);
 const [coveredCount, setCoveredCount] = useState(0);
 const [pendingCount, setPendingCount] = useState(0);
-const [unassignedSpots, setUnassignedSpots] = useState(0);
-const [spotAddOpen, setSpotAddOpen] = useState(false);
-const balancePrevRef = useRef(null);
-const [balanceAlert, setBalanceAlert] = useState('');
+  const [unassignedSpots, setUnassignedSpots] = useState(0);
+  const [spotAddOpen, setSpotAddOpen] = useState(false);
+  const balancePrevRef = useRef(null);
+  const [balanceAlert, setBalanceAlert] = useState('');
   const hasAnyPayment = trip ? (listPayments(trip.id).length > 0) : false
-const hasStarted = trip ? (new Date(trip.startDate) <= new Date()) : false
+  const hasStarted = trip ? (new Date(trip.startDate) <= new Date()) : false
+  const [paymentTip, setPaymentTip] = useState(false);
+  const [claimsTip, setClaimsTip] = useState(false);
+  const tour = useTour();
+  const { completeStep: completeTourStep, disableTour } = tour;
+const tripTourOrder = ['paymentSummary', 'claims', 'spotOverview', 'readyRoster', 'pendingCoverage'];
+const activeTripStep = tour.enabled ? tripTourOrder.find(step => !tour.steps?.[step]) : null;
+const tripTourActive = tour.enabled && !!activeTripStep;
 
 // --- helpers ---
 function parseLocalDate(iso) {
@@ -656,6 +665,10 @@ const hasMembers = !!(trip?.members?.length);
 
 // your policy: must have paid at least once AND trip has started
 const canClaim = hasPayments && tripStarted && hasMembers;
+
+const tourStepIndex = activeTripStep ? tripTourOrder.indexOf(activeTripStep) + 1 : 0;
+const tourStepLabel = activeTripStep ? `Step ${tourStepIndex} of ${tripTourOrder.length}` : '';
+const tourClass = (step) => (tripTourActive ? (activeTripStep === step ? 'tour-focus' : 'tour-dim') : '');
   
 function refreshTripClaims(nextTrip = null) {
   const sourceTrip = nextTrip || trip;
@@ -1568,179 +1581,253 @@ function onEditMember(memberId) {
       <div className="row g-4">
       <div className="col-lg-4">
           {/* Payment Summary Card */}
-          <div className="card">
-            <div className="card-header bg-agf1 text-white fw-bold">Payment summary</div>
-            <div className="card-body">
-              {balanceAlert && (
-                <div className="alert alert-warning py-2 px-3 small mb-3">
-                  {balanceAlert}
-                </div>
-              )}
-              <div className="d-flex justify-content-between">
-                <span className="text-muted">Confirmed People</span>
-                <strong>{confirmedCount}</strong>
+          <div className={`position-relative ${tourClass('paymentSummary')}`}>
+            <div className="card">
+              <div className="card-header bg-agf1 text-white fw-bold d-flex justify-content-between align-items-center">
+                <span>Payment summary</span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-white text-decoration-none p-0"
+                  onClick={() => setPaymentTip(t => !t)}
+                  aria-label="Toggle payment summary tip"
+                >
+                  ?
+                </button>
               </div>
-              <div className="d-flex justify-content-between">
-                <span className="text-muted">Days</span>
-                <strong>{days}</strong>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span className="text-muted">Rate</span>
-                <strong>{cents(trip.rateCents || 0)} / person / day</strong>
-              </div>
-              {balanceDue === 0 && confirmedCount > 0 ? (
-                <div className="mt-3">
-                  <p className="fw-bold agf1 mb-3">
-                    Balance is paid right now. Keep an eye on changes—adding travelers or editing dates can reopen a balance.
-                  </p>
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary w-100"
-                    onClick={() => {
-                      const snap = buildReceiptSnapshot(trip);
-                      openReceiptPrintWindow(snap);
-                    }}
-                  >
-                    Print receipt
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <hr />
-                  <div className="d-flex justify-content-between">
-                    <span>Subtotal</span>
-                    <strong>{cents(subtotal)}</strong>
-                  </div>
-                  <div className="d-flex justify-content-between">
-                    <span>Trip Credits</span>
-                    <strong>- {cents(credit)}</strong>
-                  </div>
-                  <hr />
-                </>
-              )}
-
-              {balanceDue > 0 && (
-                <>
-                  <div className="d-flex justify-content-between">
-                    <span className="text-danger">Balance due</span>
-                    <strong className="text-danger">{cents(balanceDue)}</strong>
-                  </div>
-                  <button
-                    className="btn btn-primary w-100 mt-2"
-                    disabled={confirmedCount === 0 || balanceDue === 0 || paying}
-                    onClick={payBalance}
-                  >
-                    {paying ? 'Paying…' : `Pay ${cents(balanceDue)}`}
-                  </button>
-                  <p className="small text-muted text-center mt-2 mb-0">
-                    Payments cover confirmed travelers only.
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Claims Card */}
-          <div className="card mt-3">
-            <div className="card-header fw-bold bg-dark text-white">Claims</div>
-            <div className="card-body">
-              <button
-                className={`btn ${canClaim ? 'btn-outline-primary' : 'btn-outline-secondary'} w-100`}
-                disabled={!canClaim}
-                onClick={openClaim}
-              >
-                Make a claim
-              </button>
-
-              {claimSuccess && (
-                <div className="alert alert-success mt-3 mb-0">
-                  <div>{claimSuccess}</div>
-                  <button
-                    type="button"
-                    className="btn btn-link btn-sm ps-0"
-                    onClick={() => nav('/claims')}
-                  >
-                    View in Claims
-                  </button>
-                </div>
-              )}
-
-              {tripClaims.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-muted text-uppercase small fw-semibold mb-2">
-                    Active claims
-                  </div>
-                  <ul className="list-unstyled mb-0 small">
-                    {tripClaims.map((claim) => (
-                      <li
-                        key={claim.id}
-                        className="d-flex justify-content-between align-items-start py-2 border-top"
-                      >
+              <div className="card-body">
+                {paymentTip ? (
+                  <TourCallout
+                    title="How payments work"
+                    description="Confirmed travelers drive the balance. Credits mint seats; pay here to create seats you can assign to travelers."
+                    stepLabel={tourStepLabel}
+                    onDismiss={() => setPaymentTip(false)}
+                    dismissLabel="Close"
+                    showTurnOff={false}
+                  />
+                ) : (
+                  <>
+                    {balanceAlert && (
+                      <div className="alert alert-warning py-2 px-3 small mb-3">
+                        {balanceAlert}
+                      </div>
+                    )}
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Confirmed People</span>
+                      <strong>{confirmedCount}</strong>
+                    </div>
+                    <div className="d-flex justify-content-between">
+                      <span className="text-muted">Days</span>
+                      <strong>{days}</strong>
+                    </div>
+                    <div className="d-flex justify-content-between mb-2">
+                      <span className="text-muted">Rate</span>
+                      <strong>{cents(trip.rateCents || 0)} / person / day</strong>
+                    </div>
+                    {balanceDue === 0 && confirmedCount > 0 ? (
+                      <div className="mt-3">
+                        <p className="fw-bold agf1 mb-3">
+                          Balance is paid right now. Keep an eye on changes—adding travelers or editing dates can reopen a balance.
+                        </p>
                         <button
                           type="button"
-                          className="btn btn-link p-0 text-start text-decoration-none me-3 flex-grow-1"
-                          onClick={() => nav('/claims', { state: { highlightClaimId: claim.id } })}
+                          className="btn btn-outline-secondary w-100"
+                          onClick={() => {
+                            const snap = buildReceiptSnapshot(trip);
+                            openReceiptPrintWindow(snap);
+                          }}
                         >
-                          <div className="fw-semibold text-dark">
-                            {claim.memberName || 'Traveler'}
-                          </div>
-                          <div className="text-muted">
-                            {claim.incidentType} — {claim.incidentDate}
-                          </div>
+                          Print receipt
                         </button>
-                        <span className="badge text-bg-secondary text-nowrap">
-                          {claim.status.replace('_', ' ')}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                      </div>
+                    ) : (
+                      <>
+                        <hr />
+                        <div className="d-flex justify-content-between">
+                          <span>Subtotal</span>
+                          <strong>{cents(subtotal)}</strong>
+                        </div>
+                        <div className="d-flex justify-content-between">
+                          <span>Trip Credits</span>
+                          <strong>- {cents(credit)}</strong>
+                        </div>
+                        <hr />
+                      </>
+                    )}
 
-              {!canClaim && (
-                <p className="small text-muted mt-2 text-center">
-                  {!hasPayments ? 'You need at least one payment or credit on this trip.' :
-                   !tripStarted ? 'Claims open on the trip start date.' :
-                   !hasMembers  ? 'Add a traveler before filing a claim.' : null}
-                </p>
-              )}
-
-              {trip && (
-                <ClaimQuickModal
-                  open={showClaim}
-                  onClose={() => {
-                    setShowClaim(false)
-                  }}
-                  onSubmitted={(claimRow) => {
-                    setShowClaim(false)
-                    setClaimSuccess('Claim submitted. We logged it for this trip.')
-                    refreshTripClaims()
-                  }}
-                  trip={trip}
-                  members={claimMembers}
-                />
-              )}
+                    {balanceDue > 0 && (
+                      <>
+                        <div className="d-flex justify-content-between">
+                          <span className="text-danger">Balance due</span>
+                          <strong className="text-danger">{cents(balanceDue)}</strong>
+                        </div>
+                        <button
+                          className="btn btn-primary w-100 mt-2"
+                          disabled={confirmedCount === 0 || balanceDue === 0 || paying}
+                          onClick={payBalance}
+                        >
+                          {paying ? 'Paying…' : `Pay ${cents(balanceDue)}`}
+                        </button>
+                        <p className="small text-muted text-center mt-2 mb-0">
+                          Payments cover confirmed travelers only.
+                        </p>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+            {activeTripStep === 'paymentSummary' && (
+              <TourCallout
+                className="tour-flyout"
+                title="Review the payment summary"
+                description="This panel tracks confirmed travelers, day rate, credits, and balance due. Pay the balance when you’re ready to mint seats."
+                stepLabel={tourStepLabel}
+                onDismiss={() => completeTourStep('paymentSummary')}
+                onTurnOff={disableTour}
+              />
+            )}
           </div>
 
-          {/* Refunds Card */}
-          <div className="card mt-3">
-            <div className="card-header fw-bold bg-dark text-white">Refunds</div>
-            <div className="card-body">
-              <p className="small text-muted mb-3">
-                Refunds return unused trip credits after the itinerary has started. Use this if a covered traveler can no longer go.
-              </p>
-              <button
-                className="btn btn-outline-success w-100"
-                disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
-                onClick={refundAllCredits}
-              >
-                {refunding ? 'Processing…' : `Request refund ${cents(refundDue)}`}
-              </button>
-              <p className="small text-center mt-2 mb-0">
-                Refunds can be initiated after the first date of the trip.
-              </p>
+          {/* Claims + Refunds */}
+          <div className={`position-relative mt-3 ${tourClass('claims')}`}>
+            <div className="card">
+              <div className="card-header fw-bold bg-dark text-white d-flex justify-content-between align-items-center">
+                <span>Claims</span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-link text-white text-decoration-none p-0"
+                  onClick={() => setClaimsTip(t => !t)}
+                  aria-label="Toggle claims tip"
+                >
+                  ?
+                </button>
+              </div>
+              <div className="card-body">
+                {claimsTip ? (
+                  <TourCallout
+                    title="Claims and refunds"
+                    description="File a claim after the trip starts, or request refunds for unused credits. Keep travelers added so we know who’s covered."
+                    stepLabel={tourStepLabel}
+                    onDismiss={() => setClaimsTip(false)}
+                    dismissLabel="Close"
+                    showTurnOff={false}
+                  />
+                ) : (
+                  <>
+                    <button
+                      className={`btn ${canClaim ? 'btn-outline-primary' : 'btn-outline-secondary'} w-100`}
+                      disabled={!canClaim}
+                      onClick={() => {
+                        openClaim();
+                        if (activeTripStep === 'claims') completeTourStep('claims');
+                      }}
+                    >
+                      Make a claim
+                    </button>
+
+                    {claimSuccess && (
+                      <div className="alert alert-success mt-3 mb-0">
+                        <div>{claimSuccess}</div>
+                        <button
+                          type="button"
+                          className="btn btn-link btn-sm ps-0"
+                          onClick={() => nav('/claims')}
+                        >
+                          View in Claims
+                        </button>
+                      </div>
+                    )}
+
+                    {tripClaims.length > 0 && (
+                      <div className="mt-3">
+                        <div className="text-muted text-uppercase small fw-semibold mb-2">
+                          Active claims
+                        </div>
+                        <ul className="list-unstyled mb-0 small">
+                          {tripClaims.map((claim) => (
+                            <li
+                              key={claim.id}
+                              className="d-flex justify-content-between align-items-start py-2 border-top"
+                            >
+                              <button
+                                type="button"
+                                className="btn btn-link p-0 text-start text-decoration-none me-3 flex-grow-1"
+                                onClick={() => nav('/claims', { state: { highlightClaimId: claim.id } })}
+                              >
+                                <div className="fw-semibold text-dark">
+                                  {claim.memberName || 'Traveler'}
+                                </div>
+                                <div className="text-muted">
+                                  {claim.incidentType} — {claim.incidentDate}
+                                </div>
+                              </button>
+                              <span className="badge text-bg-secondary text-nowrap">
+                                {claim.status.replace('_', ' ')}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {!canClaim && (
+                      <p className="small text-muted mt-2 text-center">
+                        {!hasPayments ? 'You need at least one payment or credit on this trip.' :
+                         !tripStarted ? 'Claims open on the trip start date.' :
+                         !hasMembers  ? 'Add a traveler before filing a claim.' : null}
+                      </p>
+                    )}
+
+                    {trip && (
+                      <ClaimQuickModal
+                        open={showClaim}
+                        onClose={() => {
+                          setShowClaim(false)
+                        }}
+                        onSubmitted={(claimRow) => {
+                          setShowClaim(false)
+                          setClaimSuccess('Claim submitted. We logged it for this trip.')
+                          refreshTripClaims()
+                        }}
+                        trip={trip}
+                        members={claimMembers}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+
+            {/* Refunds Card */}
+            <div className="card mt-3">
+              <div className="card-header fw-bold bg-dark text-white">Refunds</div>
+              <div className="card-body">
+                <p className="small text-muted mb-3">
+                  Refunds return unused trip credits after the itinerary has started. Use this if a covered traveler can no longer go.
+                </p>
+                <button
+                  className="btn btn-outline-success w-100"
+                  disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
+                  onClick={refundAllCredits}
+                >
+                  {refunding ? 'Processing…' : `Request refund ${cents(refundDue)}`}
+                </button>
+                <p className="small text-center mt-2 mb-0">
+                  Refunds can be initiated after the first date of the trip.
+                </p>
+              </div>
+            </div>
+
+            {activeTripStep === 'claims' && (
+              <TourCallout
+                className="tour-flyout"
+                title="Claims and refunds"
+                description="File a claim once the trip has started, and request refunds for unused credits. Both live here."
+                stepLabel={tourStepLabel}
+                onDismiss={() => completeTourStep('claims')}
+                onTurnOff={disableTour}
+              />
+            )}
           </div>
         </div>
         <div className="col-lg-8 d-flex flex-column gap-3">
@@ -1758,6 +1845,12 @@ function onEditMember(memberId) {
             onSearchTermChange={setRosterSearch}
             searchActive={searchActive}
             onMemberFocus={(label) => setRosterSearch((label || '').trim())}
+            tourActiveStep={tripTourActive ? activeTripStep : null}
+            tourStepLabel={tourStepLabel}
+            tourStepIndex={tourStepIndex}
+            tourStepTotal={tripTourOrder.length}
+            onTourDismiss={completeTourStep}
+            onTourTurnOff={disableTour}
             spotAddForm={(
               <TripMemberAddForm
                 tripId={trip.id}

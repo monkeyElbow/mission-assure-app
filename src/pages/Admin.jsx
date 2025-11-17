@@ -21,6 +21,7 @@ export default function Admin(){
   const [historyData, setHistoryData] = useState(null)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState(null)
+  const [demoLoading, setDemoLoading] = useState(false)
 
   // ---- Rates state ----
   const [rates, setRates] = useState([])
@@ -97,6 +98,30 @@ useEffect(()=>{
   async function unarchive(t){
     const saved = await api.updateTrip(t.id, { status:'ACTIVE' })
     setTrips(ts=>ts.map(x=>x.id===t.id? saved : x))
+  }
+
+  async function populateDemo(){
+    setErr(''); setMsg('');
+    try {
+      setDemoLoading(true);
+      const res = await api.populateDemoContent?.();
+      const ts = await api.listTrips();
+      setTrips(ts);
+      const counts = {};
+      await Promise.all(ts.map(async t=>{
+        const { members } = await api.getTrip(t.id);
+        counts[t.id] = members.length;
+      }));
+      setMembersByTrip(counts);
+      const added = Number(res?.added || 0);
+      setMsg(added > 0 ? `Added ${added} demo trip${added === 1 ? '' : 's'}.` : 'Demo data already loaded.');
+      setTimeout(()=>setMsg(''), 2500);
+    } catch (e) {
+      console.error(e);
+      setErr(e?.message || 'Unable to populate demo content.');
+    } finally {
+      setDemoLoading(false);
+    }
   }
 
   function closeHistory(){
@@ -209,6 +234,14 @@ useEffect(()=>{
               title="Download CSV"
             >
               Download CSV
+            </button>
+            <button
+              className="btn btn-outline-primary btn-sm"
+              onClick={populateDemo}
+              disabled={demoLoading}
+              title="Add sample trips and travelers"
+            >
+              {demoLoading ? 'Loading…' : 'Populate demo content'}
             </button>
           </div>
         </div>
@@ -458,7 +491,7 @@ useEffect(()=>{
                     <>
                       <div className="mb-3 small text-muted">
                         <div><strong>Trip:</strong> {historyTrip.title || 'Trip'} ({historyTrip.shortId || historyTrip.id})</div>
-                        <div><strong>Dates:</strong> {historyTrip.startDate || '—'} -> {historyTrip.endDate || '—'}</div>
+                        <div><strong>Dates:</strong> {historyTrip.startDate || '—'} &rarr; {historyTrip.endDate || '—'}</div>
                         <div><strong>Region:</strong> {historyTrip.region || '—'}</div>
                         <div><strong>Status:</strong> {historyTrip.status || '—'}</div>
                       </div>
