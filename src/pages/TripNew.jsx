@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../data/api'
+import InlineNotice from '../components/InlineNotice.jsx'
 
 export default function TripNew(){
   const nav = useNavigate();
@@ -27,7 +28,11 @@ export default function TripNew(){
   return (
     <div className="container my-3" style={{maxWidth: 720}}>
       <h1 className="h3 mb-3">New Trip</h1>
-      {err && <div className="alert alert-danger py-2">{err}</div>}
+      {err && (
+        <InlineNotice tone="danger" dismissible timeoutMs={5000} className="mb-3">
+          {err}
+        </InlineNotice>
+      )}
       <form onSubmit={submit} className="row g-3">
         <div className="col-12">
           <label className="form-label">Title</label>

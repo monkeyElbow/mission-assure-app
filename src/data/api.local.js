@@ -263,7 +263,15 @@ function getAllocationsByTrip(tripId){
 }
 
 function getAssignedSpotForMember(tripId, memberId){
-  return getAllocationsByTrip(tripId).find(s => s.status === 'ASSIGNED' && s.member_id === memberId) || null;
+  const target = memberId != null ? String(memberId) : null;
+  return getAllocationsByTrip(tripId).find(
+    s => s.status === 'ASSIGNED' && String(s.member_id) === target
+  ) || null;
+}
+
+function isTripStartedOrFinalized(trip) {
+  if (!trip?.startDate) return false;
+  return new Date(trip.startDate) <= new Date();
 }
 
 function rebalanceCoverage(tripId) {
@@ -351,6 +359,8 @@ function summaryForTrip(trip){
   const assigned = spots.filter(s => s.status === 'ASSIGNED');
   const unassigned = spots.filter(s => s.status === 'UNASSIGNED');
   const held = spots.filter(s => s.status === 'HELD');
+  const refunded = spots.filter(s => s.status === 'REFUNDED');
+  const coverage = spots;
 
   const assignedIds = new Set(assigned.map(s => s.member_id));
 
@@ -360,6 +370,10 @@ function truthy(v) {
 
   function mapMember(m, spot, covered) {
     const guardian = m.guardian || {};
+    const first = firstNonEmpty(m, ['first_name', 'firstName']) || '';
+    const last = firstNonEmpty(m, ['last_name', 'lastName']) || '';
+    const email = firstNonEmpty(m, ['email', 'emailAddress']) || '';
+    const phone = firstNonEmpty(m, ['phone', 'phoneNumber']) || '';
     const confirmed =
       truthy(m.confirmed) ||
       truthy(m.is_confirmed) ||
@@ -404,12 +418,12 @@ function truthy(v) {
       id: m.id,
       memberId: m.id,
       member_id: m.id,
-      first_name: m.firstName || '',
-      last_name: m.lastName || '',
-      firstName: m.firstName || '',
-      lastName: m.lastName || '',
-      email: m.email || '',
-      phone: m.phone ?? m.phoneNumber ?? '',
+      first_name: first,
+      last_name: last,
+      firstName: first,
+      lastName: last,
+      email,
+      phone,
       is_minor: truthy(m.isMinor) || truthy(m.minor) || truthy(m.is_minor),
       minor: truthy(m.isMinor) || truthy(m.minor) || truthy(m.is_minor),
       isMinor: truthy(m.isMinor) || truthy(m.minor) || truthy(m.is_minor),
@@ -457,6 +471,15 @@ function truthy(v) {
   const eligible_pending_count = pending_coverage.filter(m => m.eligible).length;
 
   const spot_price_cents = trip.spot_price_cents || computeSpotPriceCents(trip);
+  const pricePerSeat = trip.premiumPerSeat || spot_price_cents || 0;
+
+  const goingCount = ready_roster.length;
+  const paidSeats = coverage.filter(s =>
+    s.status === 'ASSIGNED' || s.status === 'UNASSIGNED' || s.status === 'HELD'
+  );
+  const extraSeats = Math.max(0, paidSeats.length - goingCount);
+  const refundableAmount = extraSeats * pricePerSeat;
+  const canRefund = isTripStartedOrFinalized(trip) && extraSeats > 0;
 
   return {
     trip_id: trip.id,
@@ -467,6 +490,10 @@ function truthy(v) {
     eligible_pending_count,
     unassigned_spots: unassigned.length,
     held_spots: held.length,
+    refunded_spots: refunded.length,
+    extraSeats,
+    refundableAmount,
+    canRefund,
     ready_roster,
     pending_coverage
   };
@@ -492,10 +519,10 @@ const DEMO_TRIPS = [
     paymentStatus: 'PAID',
     coverSpots: 2,
     members: [
-      { first_name: 'Sam', last_name: 'Lopez', email: 'sam@example.com', confirmed: true, active: true },
-      { first_name: 'Jordan', last_name: 'Kim', email: 'jordan@example.com', confirmed: true, active: true },
-      { first_name: 'Lee', last_name: 'Nguyen', email: 'lee@example.com', confirmed: false, active: true },
-      { first_name: 'Taylor', last_name: 'Bennett', email: 'taylor@example.com', confirmed: false, active: true }
+      { first_name: 'Sam', last_name: 'Lopez', email: 'sam.lopez@example.com', phone: '314-555-0001', confirmed: true, active: true },
+      { first_name: 'Jordan', last_name: 'Kim', email: 'jordan.kim@example.com', phone: '314-555-0002', confirmed: true, active: true },
+      { first_name: 'Lee', last_name: 'Nguyen', email: 'lee.nguyen@example.com', phone: '314-555-0003', confirmed: false, active: true },
+      { first_name: 'Taylor', last_name: 'Bennett', email: 'taylor.bennett@example.com', phone: '314-555-0004', confirmed: false, active: true }
     ]
   },
   {
@@ -506,10 +533,24 @@ const DEMO_TRIPS = [
     paymentStatus: 'PAID',
     coverSpots: 3,
     members: [
-      { first_name: 'Marisol', last_name: 'Garcia', email: 'marisol@example.com', confirmed: true, active: true },
-      { first_name: 'Caleb', last_name: 'Walker', email: 'caleb@example.com', confirmed: true, active: true },
-      { first_name: 'Ivy', last_name: 'Allen', email: 'ivy@example.com', confirmed: false, active: true },
-      { first_name: 'Noah', last_name: 'Wheeler', email: 'noah@example.com', is_minor: true, guardianApproved: true, guardian_email: 'guardian.noah@example.com' }
+      { first_name: 'Marisol', last_name: 'Garcia', email: 'marisol.garcia@example.com', phone: '+502 5550 0001', confirmed: true, active: true },
+      { first_name: 'Caleb', last_name: 'Walker', email: 'caleb.walker@example.com', phone: '+1 417-555-0002', confirmed: true, active: true },
+      { first_name: 'Ivy', last_name: 'Allen', email: 'ivy.allen@example.com', phone: '+1 417-555-0003', confirmed: false, active: true },
+      {
+        first_name: 'Noah',
+        last_name: 'Wheeler',
+        email: 'noah.wheeler@example.com',
+        phone: '+1 417-555-0004',
+        is_minor: true,
+        guardianApproved: true,
+        guardian: {
+          first_name: 'Emma',
+          last_name: 'Wheeler',
+          email: 'emma.wheeler@example.com',
+          phone: '+1 417-555-0100',
+          approved: true
+        }
+      }
     ]
   },
   {
@@ -520,8 +561,8 @@ const DEMO_TRIPS = [
     paymentStatus: 'UNPAID',
     coverSpots: 1,
     members: [
-      { first_name: 'Riley', last_name: 'Morgan', email: 'riley@example.com', confirmed: true, active: true },
-      { first_name: 'Sky', last_name: 'Patel', email: 'sky@example.com', confirmed: false, active: true }
+      { first_name: 'Riley', last_name: 'Morgan', email: 'riley.morgan@example.com', phone: '913-555-1001', confirmed: true, active: true },
+      { first_name: 'Sky', last_name: 'Patel', email: 'sky.patel@example.com', phone: '913-555-1002', confirmed: false, active: true }
     ]
   }
 ];
@@ -535,7 +576,25 @@ async function runDemoSeed({ force = false, onlyWhenEmpty = false } = {}) {
     return { added: 0, total: existingTrips.length };
   }
 
-  const existingKeys = new Set(existingTrips.map(t => demoTitleKey(t.title)));
+  // If force, clear existing demo trips (and their members/coverage) so we don't retain stale data
+  if (force) {
+    const demoKeys = new Set(DEMO_TRIPS.map(t => demoTitleKey(t.title)));
+    const toRemove = existingTrips.filter(t =>
+      t.isDemo ||
+      demoKeys.has(demoTitleKey(t.title))
+    );
+    for (const trip of toRemove) {
+      // remove coverage
+      getAllocationsByTrip(trip.id).forEach(s => store.remove(T_COVERAGE, s.id || s.spot_id));
+      // remove members
+      const mems = store.where(T_MEMBERS, m => m.tripId === trip.id);
+      mems.forEach(m => store.remove(T_MEMBERS, m.id));
+      // remove trip
+      store.remove(T_TRIPS, trip.id);
+    }
+  }
+
+  const existingKeys = new Set((store.all(T_TRIPS) || []).map(t => demoTitleKey(t.title)));
   let added = 0;
 
   for (const tmpl of DEMO_TRIPS) {
@@ -559,7 +618,13 @@ async function runDemoSeed({ force = false, onlyWhenEmpty = false } = {}) {
 
     let members = [];
     if (Array.isArray(tmpl.members) && tmpl.members.length) {
-      members = await api.addMembers(trip.id, tmpl.members);
+      const sanitized = tmpl.members.map((m, idx) => {
+        const first = m.first_name || m.firstName || `Traveler${idx+1}`;
+        const last = m.last_name || m.lastName || 'Demo';
+        const email = m.email || `${first.toLowerCase()}.${last.toLowerCase()}@example.com`;
+        return { ...m, first_name: first, last_name: last, email };
+      });
+      members = await api.addMembers(trip.id, sanitized);
     }
 
     const confirmedMembers = members.filter(m => {
@@ -633,11 +698,11 @@ async allocateCoverage(tripId, memberId, { idempotencyKey } = {}){
 },
 
 // ===== Release Coverage (move assigned spot back to pool or hold) =====
-async releaseCoverage(tripId, memberId, { reason=null, holdAfterStart=false, idempotencyKey } = {}){
-  const trip = store.byId(T_TRIPS, tripId);
-  if (!trip) throw new Error('Trip not found');
-  const member = store.byId(T_MEMBERS, memberId);
-  if (!member || member.tripId !== tripId) throw new Error('Member not found');
+  async releaseCoverage(tripId, memberId, { reason=null, holdAfterStart=false, idempotencyKey } = {}){
+    const trip = store.byId(T_TRIPS, tripId);
+    if (!trip) throw new Error('Trip not found');
+    const member = store.byId(T_MEMBERS, memberId);
+    if (!member || member.tripId !== tripId) throw new Error('Member not found');
 
   const spot = getAssignedSpotForMember(tripId, memberId);
   if (!spot) return { ok:true, alreadyReleased:true, ...summaryForTrip(trip) };
@@ -659,16 +724,51 @@ async releaseCoverage(tripId, memberId, { reason=null, holdAfterStart=false, ide
     notes: releaseNotes.join(' | ')
   });
 
-  const sum = summaryForTrip(trip);
-  return {
-    ok:true,
-    released_spot_id: spot.spot_id,
-    status: holdAfterStart ? 'HELD' : 'UNASSIGNED',
-    covered_count: sum.covered_count,
-    unassigned_spots: sum.unassigned_spots,
-    held_spots: sum.held_spots
-  };
-},
+    const sum = summaryForTrip(trip);
+    return {
+      ok:true,
+      released_spot_id: spot.spot_id,
+      status: holdAfterStart ? 'HELD' : 'UNASSIGNED',
+      covered_count: sum.covered_count,
+      unassigned_spots: sum.unassigned_spots,
+      held_spots: sum.held_spots
+    };
+  },
+  async refundExtraSeats(tripId, count = null) {
+    const trip = store.byId(T_TRIPS, tripId);
+    if (!trip) throw new Error('Trip not found');
+    const summary = summaryForTrip(trip);
+    if (!isTripStartedOrFinalized(trip)) {
+      throw new Error('Refunds only allowed at or after trip start.');
+    }
+
+    const maxExtra = summary.extraSeats;
+    if (maxExtra <= 0) {
+      return { ok: true, refundedSeats: 0, summary };
+    }
+
+    const toRefund = count == null ? maxExtra : Math.min(count, maxExtra);
+    const coverage = store.all(T_COVERAGE).filter(s => s.trip_id === tripId);
+    const refundable = coverage.filter(s =>
+      s.status === 'UNASSIGNED' || s.status === 'HELD'
+    );
+
+    let remaining = toRefund;
+    for (const seat of refundable) {
+      if (remaining <= 0) break;
+      seat.status = 'REFUNDED';
+      seat.refunded_at = isoNow();
+      store.put(T_COVERAGE, seat);
+      remaining--;
+    }
+
+    const updatedSummary = summaryForTrip(trip);
+    return {
+      ok: true,
+      refundedSeats: toRefund - remaining,
+      summary: updatedSummary
+    };
+  },
 
 // ===== Transfer Coverage (A -> B in one action) =====
 async transferCoverage(tripId, fromMemberId, toMemberId, { idempotencyKey } = {}){
@@ -931,6 +1031,17 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
         memberId: memberPrimaryId(latest),
         notes: pieces.join(' | ')
       });
+
+      // If traveler is no longer eligible/active, free their seat
+      if (!memberEligible(latest)) {
+        const seat = getAssignedSpotForMember(latest.tripId, latest.id);
+        if (seat) {
+          seat.status = 'UNASSIGNED';
+          seat.member_id = null;
+          seat.released_at = isoNow();
+          store.put(T_COVERAGE, seat);
+        }
+      }
     }
     return next;
   },

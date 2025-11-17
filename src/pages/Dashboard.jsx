@@ -8,7 +8,6 @@ import { fadeSlide } from '../ui/motion';
 import DashSearch from '../components/DashSearch';
 import { Container, Card, Row, Col } from 'react-bootstrap';
 import AppLogoIntro from '../ui/AppLogoIntro';
-import { useTour } from '../core/TourContext.jsx';
 import TourCallout from '../components/tour/TourCallout.jsx';
 
 // ---- helpers ----
@@ -137,6 +136,9 @@ function TripCard({ t, meta = {} }) {
             {isArchived && (
               <span className="badge text-bg-secondary">ARCHIVED</span>
             )}
+            {!isArchived && memberCount === 0 && (
+              <span className="badge text-bg-light text-muted">Ready to add people</span>
+            )}
               </div>
             </div>
           </Col>
@@ -155,9 +157,6 @@ export default function Dashboard() {
   const [trips, setTrips] = useState([]);
   const [metaByTrip, setMetaByTrip] = useState({});
   const [filter, setFilter] = useState('ACTIVE'); // ACTIVE | ARCHIVED | ALL
-  const tour = useTour();
-  const { enabled: tourOn, steps: tourSteps, enableTour, disableTour, completeStep, stepOrder } = tour;
-  const tourStepLabel = stepOrder ? `Step ${stepOrder.indexOf('dashboardIntro') + 1} of ${stepOrder.length}` : '';
 
   useEffect(() => {
     (async () => {
@@ -211,15 +210,10 @@ export default function Dashboard() {
 
   // empty state helper
   const list = Array.isArray(filtered) ? filtered : Array.isArray(trips) ? trips : [];
-  const dashboardStepOpen = tourOn && !tourSteps.dashboardIntro;
 
 // logo intro animation
 const [introDone, setIntroDone] = useState(false);
 const handleIntroDone = useCallback(() => setIntroDone(true), []);
-const handleTourToggle = useCallback((checked) => {
-  if (checked) enableTour(true);
-  else disableTour();
-}, [enableTour, disableTour]);
 
   return (
 
@@ -233,27 +227,12 @@ const handleTourToggle = useCallback((checked) => {
     <Container>
       <div className="d-flex align-items-center justify-content-between my-3">
         <h1 className="h3 mb-0">Leader Dashboard</h1>
-        <div className="d-flex align-items-center gap-3">
-          <div className="form-check form-switch mb-0 small">
-            <input
-              className="form-check-input"
-              type="checkbox"
-              id="tourToggle"
-              checked={tourOn}
-              onChange={(e) => handleTourToggle(e.target.checked)}
-            />
-            <label className="form-check-label" htmlFor="tourToggle">Tour mode</label>
-          </div>
-          <Link
-            to="/trips/new"
-            className="btn btn-primary"
-            onClick={() => {
-              if (dashboardStepOpen) completeStep('dashboardIntro');
-            }}
-          >
-            Create Trip
-          </Link>
-        </div>
+        <Link
+          to="/trips/new"
+          className="btn btn-primary"
+        >
+          Create Trip
+        </Link>
       </div>
 
       <DashSearch value={q} onChange={setQ} />
@@ -282,22 +261,15 @@ const handleTourToggle = useCallback((checked) => {
 
       {list.length === 0 ? (
         <div className="card p-3">
-          {dashboardStepOpen ? (
-            <TourCallout
-              title="Add your first trip"
-              description="Start by creating a trip. We’ll walk you through payments, claims, and rosters next."
-              stepLabel={tourStepLabel}
-              actionLabel="Create trip"
-              onAction={() => {
-                completeStep('dashboardIntro');
-                navigate('/trips/new');
-              }}
-              onDismiss={() => completeStep('dashboardIntro')}
-              onTurnOff={disableTour}
-            />
-          ) : (
-            <p className="text-muted mb-0">No trips in this view.</p>
-          )}
+          <TourCallout
+            title="Add your first trip"
+            description="Start by creating a trip. We’ll walk you through payments, claims, and rosters next."
+            stepLabel="Get started"
+            actionLabel="Create trip"
+            onAction={() => navigate('/trips/new')}
+            onDismiss={() => {}}
+            showTurnOff={false}
+          />
         </div>
       ) : (
         <div className="row g-3">

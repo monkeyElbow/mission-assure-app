@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { api } from '../data/api'
 import { listClaims, updateClaim, addClaimAttachment } from '../core/claims'
 import ClaimQuickModal from '../components/trip/ClaimQuickModal.jsx'
+import InlineNotice from '../components/InlineNotice.jsx'
 
 export function removeClaimsForTrip(tripId){
   const KEY = 'missionassure.v1.claims';
@@ -140,8 +141,16 @@ export default function Claims(){
         </button>
       </div>
 
-      {err && <div className="alert alert-danger py-2">{err}</div>}
-      {success && <div className="alert alert-success py-2">{success}</div>}
+      {err && (
+        <InlineNotice tone="danger" dismissible timeoutMs={6000} className="mb-2">
+          {err}
+        </InlineNotice>
+      )}
+      {success && (
+        <InlineNotice tone="success" dismissible timeoutMs={4000} className="mb-2">
+          {success}
+        </InlineNotice>
+      )}
 
       {/* filters */}
       <div className="d-flex flex-column flex-md-row gap-2 mb-3 align-items-md-center">

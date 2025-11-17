@@ -1,13 +1,16 @@
 import React, { useState } from 'react'
+import InlineNotice from '../InlineNotice.jsx'
 import TourCallout from '../tour/TourCallout.jsx'
 
 export default function TripMembersList({
   ready = [],
   pending = [],
+  standby = [],
   overviewReady = ready,
   overviewPending = pending,
   coveredCount = 0,
   pendingCount = 0,
+  standbyCount = 0,
   unassignedSpots = 0,
   spotAddOpen = false,
   onSpotAddToggle = () => {},
@@ -19,16 +22,19 @@ export default function TripMembersList({
   onMemberFocus,
   renderReadyItem,
   renderPendingItem,
+  renderStandbyItem,
   tourActiveStep = null,
   tourStepLabel = '',
   tourStepIndex = 0,
   tourStepTotal = 0,
   onTourDismiss = () => {},
-  onTourTurnOff = () => {}
+  onTourTurnOff = () => {},
+  rosterNotice = ''
 }) {
   const renderReady = renderReadyItem || (() => null);
   const renderPending = renderPendingItem || (() => null);
-  const totalMatches = ready.length + pending.length;
+  const renderStandby = renderStandbyItem || renderPending;
+  const totalMatches = ready.length + pending.length + standby.length;
   const readyMatchIds = new Set(ready.map((m) => String(m.member_id ?? m.id ?? '')));
   const pendingMatchIds = new Set(pending.map((m) => String(m.member_id ?? m.id ?? '')));
   const searchLabel = searchTerm.trim();
@@ -55,10 +61,15 @@ export default function TripMembersList({
 
   return (
     <div className="d-flex flex-column gap-3">
+      {rosterNotice && (
+        <InlineNotice tone="info" timeoutMs={4000} className="mb-0">
+          {rosterNotice}
+        </InlineNotice>
+      )}
       {rosterError && (
-        <div className="alert alert-danger mb-0">
+        <InlineNotice tone="danger" dismissible timeoutMs={null} className="mb-0">
           Roster error: {String(rosterError)}
-        </div>
+        </InlineNotice>
       )}
 
       <div className={`card position-relative ${sectionClass('spotOverview')}`}>
@@ -70,7 +81,7 @@ export default function TripMembersList({
             onClick={() => setSpotTip(v => !v)}
             aria-label="Toggle spot overview tip"
           >
-            ?
+            <i className="bi bi-question-circle" aria-hidden="true"></i>
           </button>
         </div>
         <div className="card-body pb-2">
@@ -271,20 +282,17 @@ export default function TripMembersList({
       <div className={`card position-relative ${sectionClass('readyRoster')}`}>
         <div className="card-header d-flex justify-content-between align-items-start bg-agf2 text-white">
           <div className="d-flex flex-column">
-            <div className="fw-semibold h5">Ready Roster</div>
+            <div className="fw-semibold">Ready Roster <span className="badge bg-agf1 text-white">{coveredCount}</span></div>
             <div className="small text-white">Persons covered and ready to go</div>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <span className="badge bg-agf1 text-white">{coveredCount}</span>
-            <button
-              type="button"
-              className="btn btn-sm btn-link text-white text-decoration-none p-0"
-              onClick={() => setReadyTip(v => !v)}
-              aria-label="Toggle ready roster tip"
-            >
-              ?
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-link text-white text-decoration-none p-0"
+            onClick={() => setReadyTip(v => !v)}
+            aria-label="Toggle ready roster tip"
+          >
+            <i className="bi bi-question-circle" aria-hidden="true"></i>
+          </button>
         </div>
         <div className="card-body p-0">
           {readyTip ? (
@@ -319,20 +327,17 @@ export default function TripMembersList({
       <div className={`card position-relative ${sectionClass('pendingCoverage')}`}>
         <div className="card-header d-flex justify-content-between align-items-start bg-mango">
           <div className="d-flex flex-column">
-            <div className="fw-semibold h5">Pending Coverage</div>
+            <div className="fw-semibold">Pending Coverage <span className="badge bg-dark">{pendingCount}</span></div>
             <div className="text-muted small">Travelers are moved to ready once confirmed</div>
           </div>
-          <div className="d-flex align-items-center gap-2">
-            <span className="badge bg-dark">{pendingCount}</span>
-            <button
-              type="button"
-              className="btn btn-sm btn-link text-dark text-decoration-none p-0"
-              onClick={() => setPendingTip(v => !v)}
-              aria-label="Toggle pending coverage tip"
-            >
-              ?
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn btn-sm btn-link text-dark text-decoration-none p-0"
+            onClick={() => setPendingTip(v => !v)}
+            aria-label="Toggle pending coverage tip"
+          >
+            <i className="bi bi-question-circle" aria-hidden="true"></i>
+          </button>
         </div>
         <div className="card-body p-0">
           {pendingTip ? (
@@ -362,6 +367,22 @@ export default function TripMembersList({
             onTurnOff={onTourTurnOff}
           />
         )}
+      </div>
+
+      <div className="card position-relative">
+        <div className="card-header d-flex justify-content-between align-items-start bg-light">
+          <div className="d-flex flex-column">
+            <div className="fw-semibold mb-0">Standby <span className="badge text-bg-secondary">{standbyCount}</span></div>
+            <div className="text-muted small">Inactive travelers; seats released to the pool</div>
+          </div>
+        </div>
+        <div className="card-body p-0">
+          {standby.length === 0 ? (
+            <div className="p-3 text-muted">No standby travelers.</div>
+          ) : (
+            standby.map(renderStandby)
+          )}
+        </div>
       </div>
     </div>
   )

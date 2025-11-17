@@ -12,6 +12,7 @@ import GuardianApprovalModal from '../components/trip/GuardianApprovalModal.jsx'
 import { coverageSummary } from '/src/core/coverage'
 import { useTour } from '../core/TourContext.jsx'
 import TourCallout from '../components/tour/TourCallout.jsx'
+import InlineNotice from '../components/InlineNotice.jsx'
 
 
 // === helpers (module scope) ===
@@ -351,7 +352,11 @@ function startEdit() {
 
 
   // --- UI
-  const fullName = `${first_name || ''} ${last_name || ''}`.trim() || 'Unnamed';
+  const fullName =
+  (`${member.firstName || member.first_name || ''} ${member.lastName || member.last_name || ''}`.trim()) ||
+  member.name ||
+  member.fullName ||
+  '(Name unavailable)';
 
   return (
     <div className="d-flex align-items-start justify-content-between py-2 border-bottom" role="listitem">
@@ -500,7 +505,7 @@ function startEdit() {
       <div className="d-flex align-items-center gap-2 ms-2">
         {!editing ? (
           <>
-            {status === 'pending' && (
+            {(status === 'pending' || status === 'standby') && (
               <button
                 className="btn btn-sm btn-primary"
                 disabled={!canAllocate}
@@ -515,9 +520,9 @@ function startEdit() {
                 className="btn btn-sm btn-outline-secondary"
                 disabled={!canRelease}
                 onClick={onRelease}
-                title={canRelease ? 'Remove traveler from this seat' : 'No seat to remove'}
+                title={canRelease ? 'Move traveler to Standby and free their seat' : 'No seat to remove'}
               >
-                Remove
+                Move to Standby
               </button>
             )}
             <button className="btn btn-sm btn-outline-dark me-2" onClick={startEdit}>Edit</button>
@@ -622,6 +627,10 @@ const [claimSuccess, setClaimSuccess] = useState('')
 const [tripClaims, setTripClaims] = useState([])
 const [rosterLoading, setRosterLoading] = useState(false);
 const [rosterError, setRosterError] = useState(null);
+const [rosterNotice, setRosterNotice] = useState('');
+const [extraSeats, setExtraSeats] = useState(0);
+const [refundableAmount, setRefundableAmount] = useState(0);
+const [canRefund, setCanRefund] = useState(false);
 const [ready, setReady] = useState([]);
 const [pending, setPending] = useState([]);
 const [coveredCount, setCoveredCount] = useState(0);
@@ -635,12 +644,12 @@ const [pendingCount, setPendingCount] = useState(0);
   const [paymentTip, setPaymentTip] = useState(false);
   const [claimsTip, setClaimsTip] = useState(false);
   const tour = useTour();
-  const { completeStep: completeTourStep, disableTour } = tour;
-const tripTourOrder = ['paymentSummary', 'claims', 'spotOverview', 'readyRoster', 'pendingCoverage'];
-const activeTripStep = tour.enabled ? tripTourOrder.find(step => !tour.steps?.[step]) : null;
-const tripTourActive = tour.enabled && !!activeTripStep;
+const { completeStep: completeTourStep, disableTour, enableTour } = tour;
+  const tripTourOrder = ['paymentSummary', 'claims', 'spotOverview', 'readyRoster', 'pendingCoverage'];
+  const activeTripStep = tour.enabled ? tripTourOrder.find(step => !tour.steps?.[step]) : null;
+  const tripTourActive = tour.enabled && !!activeTripStep;
 
-// --- helpers ---
+  // --- helpers ---
 function parseLocalDate(iso) {
   if (!iso) return null;
   const [y, m, d] = iso.split('-').map(Number);
@@ -779,6 +788,7 @@ async function load(showSpinner = true){
     () => members.filter(isEligibleMember).length,
     [members]
   );
+  const standbyAllocatable = (member) => isEligibleMember({ ...member, active: true });
 
   // --- Payment summary (derived from current snapshot on the trip) ---
   const days = useMemo(()=> trip ? daysBetween(trip.startDate, trip.endDate) : 0,
@@ -933,7 +943,19 @@ async function load(showSpinner = true){
       setRefunding(false);
     }
   }
-  
+
+  async function handleRefundExtraSeats() {
+    if (!trip) return;
+    if (!window.confirm('Refund all extra paid seats?')) return;
+    try {
+      const res = await api.refundExtraSeats(trip.id, null);
+      setRosterNotice(`Refunded ${res?.refundedSeats || 0} extra seat(s).`);
+      await loadRoster();
+    } catch (e) {
+      alert(e?.message || 'Could not refund extra seats.');
+    }
+  }
+
 
 
 
@@ -986,6 +1008,7 @@ async function loadRoster(explicitTrip) {
   if (!targetTrip?.id) return;
   setRosterLoading(true);
   setRosterError(null);
+  setRosterNotice('');
   try {
     let sum = await api.getRosterSummary(targetTrip.id);
 
@@ -1013,9 +1036,25 @@ async function loadRoster(explicitTrip) {
     setPending(sum.pending_coverage || []);
     setCoveredCount(sum.covered_count || 0);
     setPendingCount(sum.pending_count || 0);
+    setExtraSeats(sum.extraSeats || 0);
+    setRefundableAmount(sum.refundableAmount || 0);
+    setCanRefund(!!sum.canRefund);
     const availableUnassigned = (sum.unassigned_spots || 0) + (sum.held_spots || 0);
     setUnassignedSpots(availableUnassigned);
     setSpotPrice(sum.spot_price_cents || 0);
+
+    // Backfill missing credits for legacy/demo data that already minted seats
+    const hasCredits = Number(targetTrip?.creditsTotalCents || 0) > 0;
+    const purchasedSeats = (sum.ready_roster?.length || 0) + (sum.unassigned_spots || 0) + (sum.held_spots || 0);
+    if (!hasCredits && spotPrice > 0 && purchasedSeats > 0) {
+      const inferredCredits = spotPrice * purchasedSeats;
+      try {
+        await api.updateTrip(targetTrip.id, { creditsTotalCents: inferredCredits });
+        setTrip(t => t && t.id === targetTrip.id ? { ...t, creditsTotalCents: inferredCredits } : t);
+      } catch (err) {
+        console.warn('Unable to backfill credits for trip', targetTrip?.id, err);
+      }
+    }
   } catch (e) {
     setRosterError(e);
   } finally {
@@ -1206,28 +1245,115 @@ async function handleRequestGuardian(summaryMember) {
 
 useEffect(() => { loadRoster(); }, [trip?.id]);
 
-async function handleAllocate(memberId) {
-  const m = pending.find(p => getMemberId(p) === getMemberId({ id: memberId, member_id: memberId }));
-  if (!m || !isEligibleMember(m)) {
-    alert('This traveler isn’t eligible yet. Adults need Confirmed; minors need Guardian Approved.');
-    return;
-  }
+// Allocate a seat for a traveler from Pending or Standby
+// summaryMember = item from ready/pending/standby lists
+async function handleAllocate(summaryMember) {
+  try {
+    if (!summaryMember) {
+      alert('Unable to locate traveler to allocate seat.');
+      return;
+    }
 
-  if (unassignedSpots <= 0) await api.applyPayment(trip.id, 0, { autoAllocate: false });
-  await api.allocateCoverage(trip.id, memberId);
-  await loadRoster();
+    const canonical = await fetchCanonicalMember(summaryMember);
+    if (!canonical || canonical.id == null) {
+      alert('Unable to locate traveler to allocate seat.');
+      return;
+    }
+
+    const memberId = canonical.id;
+
+    if (canonical.active === false) {
+      await api.updateMember(memberId, { active: true });
+    }
+
+    await ensureCoverageForMember(memberId);
+
+    await refreshMembers();
+    setRosterNotice('Allocated seat for traveler and moved them to Ready.');
+  } catch (err) {
+    console.error('Error allocating coverage for traveler', err);
+    const message = err?.message || 'Unable to allocate coverage.';
+    alert(message);
+  }
 }
 
 
 
 async function handleRelease(memberSummary) {
-  const memberId = getMemberId(memberSummary);
-  if (!memberId) return;
   try {
-    await api.releaseCoverage(trip.id, memberId, { reason: 'Leader action' });
-    await refreshMembers();
+    const candidates = [
+      memberSummary?.member_id,
+      memberSummary?.id,
+      memberSummary?.memberId
+    ].filter(v => v !== undefined && v !== null);
+    const canonicalId = await resolveCanonicalMemberId(api, trip.id, memberSummary);
+    if (canonicalId != null) candidates.unshift(canonicalId);
+
+    let released = false;
+    let alreadyReleased = false;
+    let lastError = null;
+
+    for (const candidate of candidates) {
+      try {
+        const res = await api.releaseCoverage(trip.id, candidate, { reason: 'Leader action' });
+        released = true;
+        if (res?.alreadyReleased) alreadyReleased = true;
+        break;
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+    }
+
+    if (!released) {
+      throw lastError || new Error('Unable to identify this traveler to release coverage.');
+    }
+
+    setRosterNotice(alreadyReleased
+      ? 'Seat already unassigned for this traveler.'
+      : 'Moved traveler from Ready to Pending and freed a seat.'
+    );
+    await loadRoster(); // refresh summary/roster only
   } catch (e) {
     alert(e.message || 'Could not release coverage');
+  }
+}
+
+async function handleMoveToStandby(memberSummary) {
+  try {
+    const candidates = [
+      memberSummary?.member_id,
+      memberSummary?.id,
+      memberSummary?.memberId
+    ].filter(v => v !== undefined && v !== null);
+
+    const canonicalId = await resolveCanonicalMemberId(api, trip.id, memberSummary);
+    if (canonicalId != null) candidates.unshift(canonicalId);
+
+    if (candidates.length === 0) {
+      throw new Error('Unable to identify this traveler to move to Standby.');
+    }
+
+    let updated = null;
+    let lastError = null;
+    for (const candidate of candidates) {
+      try {
+        updated = await api.updateMember(candidate, { active: false });
+        break;
+      } catch (err) {
+        lastError = err;
+        continue;
+      }
+    }
+
+    if (!updated) {
+      throw lastError || new Error('Could not update traveler.');
+    }
+
+    await refreshMembers();
+    setRosterNotice('Moved traveler to Standby and returned their seat to the pool.');
+  } catch (e) {
+    alert(e.message || 'Could not move traveler to Standby');
   }
 }
 
@@ -1258,12 +1384,13 @@ function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null } = {})
   const members = Array.isArray(trip?.members) ? trip.members : [];
   const isConfirmed = (m) => (m.isMinor ? m.guardianApproved : m.confirmed);
 
-  const confirmedMembers   = members.filter(isConfirmed);
-  const unconfirmedMembers = members.filter(m => !isConfirmed(m));
+  const confirmedMembers   = members.filter(m => isConfirmed(m) && (m.active !== false));
+  const unconfirmedMembers = members.filter(m => !isConfirmed(m) && (m.active !== false));
 
   const cov = coverageSummary(trip, members);
 const coveredIdsArray = [...cov.coveredIds]; // plain array safe for JSON/templating
 const coveredMembers = members.filter(m => cov.coveredIds.has(m.id));
+  const notCoveredMembers = members.filter(m => !cov.coveredIds.has(m.id));
 
   const subtotalCents = (trip?.rateCents || 0) *
                         (typeof daysInclusive === 'function' ? daysInclusive(trip?.startDate, trip?.endDate) : 0) *
@@ -1287,6 +1414,7 @@ const coveredMembers = members.filter(m => cov.coveredIds.has(m.id));
     coveredCount: cov.coveredCount,
     coveredIds: coveredIdsArray,   // names list filter in HTML
     coveredMembers,                // convenience: already filtered objects
+    notCoveredMembers,
 
 
     subtotalCents, creditsCents, balanceDue,
@@ -1401,33 +1529,54 @@ ${
   </div>
 
   <div class="card" style="margin-top:16px;">
-  <div><strong>Participants at time of receipt</strong></div>
-
-  <div style="margin-top:8px;">
-    <div class="small muted">COVERED (confirmed)</div>
-    <ul style="margin:6px 0 10px 18px;">
-      ${
-        (snap.coveredMembers?.length)
-         ? snap.coveredMembers.map(m => `<li>${escapeHtml(`${m.firstName||''} ${m.lastName||''}`.trim())}</li>`).join('')
-        : '<li>None</li>'
-      }
-    </ul>
-  </div>
-
-  <div>
-    <div class="small muted" style="color:#B00020;"><strong>NOT COVERED (not confirmed)</strong></div>
-    <ul style="margin:6px 0 0 18px;">
-      ${
-        (snap.coveredMembers?.length)
-        ? snap.coveredMembers.map(m => `<li>${escapeHtml(`${m.firstName||''} ${m.lastName||''}`.trim())}</li>`).join('')
-       : '<li>None</li>'
-      }
-    </ul>
-    <div class="small" style="margin-top:8px; color:#B00020;">
-      Legal notice: Individuals listed as “Not covered” were not confirmed at the time of this receipt and are not insured under Mission Assure coverage. Coverage requires confirmation and payment prior to departure.
+    <div>
+      <strong>${
+        (snap.notCoveredMembers && snap.notCoveredMembers.length > 0)
+          ? 'Participants at time of receipt'
+          : 'All participants covered at time of receipt'
+      }</strong>
     </div>
+
+    <div style="margin-top:8px;">
+      <div class="small muted">COVERED (confirmed &amp; paid)</div>
+      <ul style="margin:6px 0 10px 18px;">
+        ${
+          (snap.coveredMembers && snap.coveredMembers.length > 0)
+            ? snap.coveredMembers
+                .map(m => {
+                  const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || '(Name unavailable)';
+                  return `<li>${escapeHtml(name)}</li>`;
+                })
+                .join('')
+            : '<li>None</li>'
+        }
+      </ul>
+    </div>
+
+    ${
+      (snap.notCoveredMembers && snap.notCoveredMembers.length > 0) ? `
+    <div style="margin-top:12px;">
+      <div class="small muted" style="color:#B00020;">
+        <strong>NOT COVERED on this receipt</strong>
+      </div>
+      <ul style="margin:6px 0 0 18px;">
+        ${
+          snap.notCoveredMembers
+            .map(m => {
+              const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || '(Name unavailable)';
+              return `<li>${escapeHtml(name)}</li>`;
+            })
+            .join('')
+        }
+      </ul>
+      <div class="small" style="margin-top:8px; color:#B00020;">
+        Legal notice: Individuals listed as “Not covered” are not insured under this receipt as of the time shown.
+        Coverage requires confirmation (and guardian approval for minors) plus sufficient payment before departure.
+      </div>
+    </div>
+    ` : ''
+    }
   </div>
-</div>
 
 
   <div class="legal">
@@ -1545,7 +1694,20 @@ function onEditMember(memberId) {
                   <span className="text-muted">Pending</span>
                   <span className="fw-semibold text-warning">{pendingCount}</span>
                 </div>
-                <div className="d-flex flex-wrap gap-2 justify-content-end">
+                <div className="d-flex flex-wrap gap-2 justify-content-end align-items-center">
+                  <div className="form-check form-switch mb-0 small">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="tourToggleTrip"
+                      checked={tour.enabled}
+                      onChange={(e) => {
+                        if (e.target.checked) enableTour(true);
+                        else disableTour();
+                      }}
+                    />
+                    <label className="form-check-label" htmlFor="tourToggleTrip">Tour mode</label>
+                  </div>
                   <button className="btn btn-outline-secondary btn-sm" onClick={startEdit}>
                     Edit Trip
                   </button>
@@ -1579,7 +1741,7 @@ function onEditMember(memberId) {
       </div>
 
       <div className="row g-4">
-      <div className="col-lg-4">
+        <div className="col-lg-4">
           {/* Payment Summary Card */}
           <div className={`position-relative ${tourClass('paymentSummary')}`}>
             <div className="card">
@@ -1591,7 +1753,7 @@ function onEditMember(memberId) {
                   onClick={() => setPaymentTip(t => !t)}
                   aria-label="Toggle payment summary tip"
                 >
-                  ?
+                  <i className="bi bi-question-circle" aria-hidden="true"></i>
                 </button>
               </div>
               <div className="card-body">
@@ -1607,9 +1769,9 @@ function onEditMember(memberId) {
                 ) : (
                   <>
                     {balanceAlert && (
-                      <div className="alert alert-warning py-2 px-3 small mb-3">
-                        {balanceAlert}
-                      </div>
+                      <InlineNotice tone="warning" dismissible timeoutMs={5000} className="mb-3">
+                        <span className="small">{balanceAlert}</span>
+                      </InlineNotice>
                     )}
                     <div className="d-flex justify-content-between">
                       <span className="text-muted">Confirmed People</span>
@@ -1672,6 +1834,26 @@ function onEditMember(memberId) {
                         </p>
                       </>
                     )}
+
+                    {extraSeats > 0 && (
+                      <InlineNotice tone="info" dismissible timeoutMs={6000} className="mt-3 mb-0">
+                        <div className="fw-semibold mb-1">
+                          {extraSeats} extra paid seat{extraSeats === 1 ? '' : 's'} ({cents(refundableAmount)})
+                        </div>
+                        <div className="small text-muted">
+                          Seats that aren’t assigned to travelers can be refunded once the trip starts.
+                        </div>
+                        {canRefund && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-primary mt-2"
+                            onClick={handleRefundExtraSeats}
+                          >
+                            Refund extra seats
+                          </button>
+                        )}
+                      </InlineNotice>
+                    )}
                   </>
                 )}
               </div>
@@ -1699,7 +1881,7 @@ function onEditMember(memberId) {
                   onClick={() => setClaimsTip(t => !t)}
                   aria-label="Toggle claims tip"
                 >
-                  ?
+                  <i className="bi bi-question-circle" aria-hidden="true"></i>
                 </button>
               </div>
               <div className="card-body">
@@ -1726,7 +1908,7 @@ function onEditMember(memberId) {
                     </button>
 
                     {claimSuccess && (
-                      <div className="alert alert-success mt-3 mb-0">
+                      <InlineNotice tone="success" dismissible timeoutMs={5000} className="mt-3 mb-0">
                         <div>{claimSuccess}</div>
                         <button
                           type="button"
@@ -1735,7 +1917,7 @@ function onEditMember(memberId) {
                         >
                           View in Claims
                         </button>
-                      </div>
+                      </InlineNotice>
                     )}
 
                     {tripClaims.length > 0 && (
@@ -1833,11 +2015,13 @@ function onEditMember(memberId) {
         <div className="col-lg-8 d-flex flex-column gap-3">
           <TripMembersList
             ready={displayReady}
-            pending={displayPending}
+            pending={displayPending.filter(m => m.active !== false)}
+            standby={pending.filter(m => m.active === false)}
             overviewReady={ready}
             overviewPending={pending}
             coveredCount={displayCoveredCount}
-            pendingCount={displayPendingCount}
+            pendingCount={displayPending.filter(m => m.active !== false).length}
+            standbyCount={pending.filter(m => m.active === false).length}
             unassignedSpots={unassignedSpots}
             spotAddOpen={spotAddOpen}
             onSpotAddToggle={setSpotAddOpen}
@@ -1851,6 +2035,7 @@ function onEditMember(memberId) {
             tourStepTotal={tripTourOrder.length}
             onTourDismiss={completeTourStep}
             onTourTurnOff={disableTour}
+            rosterNotice={rosterNotice}
             spotAddForm={(
               <TripMemberAddForm
                 tripId={trip.id}
@@ -1873,7 +2058,7 @@ function onEditMember(memberId) {
                 onRequestConfirm={handleRequestConfirm}
                 onRequestGuardian={handleRequestGuardian}
                 onAllocate={undefined}
-                onRelease={() => handleRelease(member)}
+                onRelease={() => handleMoveToStandby(member)}
                 canAllocate={false}
                 canRelease={true}
               />
@@ -1887,9 +2072,24 @@ function onEditMember(memberId) {
                 onAfterSave={refreshMembers}
                 onRequestConfirm={handleRequestConfirm}
                 onRequestGuardian={handleRequestGuardian}
-                onAllocate={() => handleAllocate(member.member_id)}
+                onAllocate={() => handleAllocate(member)}
                 onRelease={undefined}
-                canAllocate={unassignedSpots > 0 && isEligibleMember(member)}
+                canAllocate={isEligibleMember(member)}
+                canRelease={false}
+              />
+            )}
+            renderStandbyItem={(member) => (
+              <MemberRow
+                key={member.member_id}
+                tripId={trip.id}
+                member={member}
+                status="standby"
+                onAfterSave={refreshMembers}
+                onRequestConfirm={handleRequestConfirm}
+                onRequestGuardian={handleRequestGuardian}
+                onAllocate={() => handleAllocate(member)}
+                onRelease={undefined}
+                canAllocate={standbyAllocatable(member)}
                 canRelease={false}
               />
             )}

@@ -40,6 +40,47 @@ html, body, #root {
 
 }
 
+.agf-alert {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 0.95rem;
+}
+.agf-alert__body { flex: 1; }
+.agf-alert__close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+}
+.agf-alert-info {
+  background: rgba(0, 173, 187, 0.1);
+  border-color: var(--agf1);
+  color: var(--agf2);
+}
+.agf-alert-success {
+  background: rgba(0, 138, 171, 0.12);
+  border-color: var(--agf2);
+  color: var(--agf2);
+}
+.agf-alert-warning {
+  background: #fff3cd;
+  border-color: #ffdd99;
+  color: #7a4a00;
+}
+.agf-alert-danger {
+  background: #ffe3e3;
+  border-color: #f7b2b2;
+  color: #8a1c1c;
+}
+
 
 
 body{font-family:"Helvetica Neue",system-ui,sans-serif;color:var(--agf-text);background:var(--agf-bg);

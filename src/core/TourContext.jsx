@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 const STORAGE_KEY = 'missionassure.tour.v1';
 
 const defaultSteps = () => ({
-  dashboardIntro: false,
+  dashboardIntro: true, // dashboard tip is now standalone; keep tour flow to trip pages
   paymentSummary: false,
   claims: false,
   spotOverview: false,
@@ -19,9 +19,12 @@ function loadState() {
     if (!raw) return initialState();
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return initialState();
+    const steps = { ...defaultSteps(), ...(parsed.steps || {}) };
+    // dashboard tip no longer part of tour flow; force it done to allow completion
+    steps.dashboardIntro = true;
     return {
       enabled: parsed.enabled !== false,
-      steps: { ...defaultSteps(), ...(parsed.steps || {}) },
+      steps,
     };
   } catch {
     return initialState();

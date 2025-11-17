@@ -6,6 +6,7 @@ import { listRates, createRate, seedRatesIfEmpty } from '../core/rates'
 import { toCSV, download } from '../core/csv'
 import { motion, AnimatePresence } from 'framer-motion'
 import { fadeSlide } from '../ui/motion'
+import InlineNotice from '../components/InlineNotice.jsx'
 
 
 export default function Admin(){
@@ -208,8 +209,16 @@ useEffect(()=>{
   return (
     <div className="container my-3" style={{maxWidth: 1100}}>
       <h1 className="h3 mb-3">Howdy, Admin</h1>
-      {err && <div className="alert alert-danger py-2">{err}</div>}
-      {msg && <div className="alert alert-success py-2">{msg}</div>}
+      {err && (
+        <InlineNotice tone="danger" dismissible timeoutMs={6000} className="mb-2">
+          {err}
+        </InlineNotice>
+      )}
+      {msg && (
+        <InlineNotice tone="success" dismissible timeoutMs={4000} className="mb-2">
+          {msg}
+        </InlineNotice>
+      )}
 
       {/* ---- Trips section ---- */}
       <div className="card p-3 mb-4 no-hover">
@@ -330,10 +339,16 @@ useEffect(()=>{
                         <button
                           className="btn btn-outline-danger d-flex align-items-center justify-content-center"
                           onClick={async ()=>{
-                            if (!confirm(`Delete trip "${t.title}" (${t.shortId||t.id})? This removes its members.`)) return;
-                            await api.deleteTrip(t.id);
-                            setTrips(ts => ts.filter(x => x.id !== t.id));
-                            setMembersByTrip(m => { const { [t.id]:_, ...rest } = m; return rest; });
+                            try {
+                              await api.deleteTrip(t.id);
+                              setTrips(ts => ts.filter(x => x.id !== t.id));
+                              setMembersByTrip(m => { const { [t.id]:_, ...rest } = m; return rest; });
+                              setMsg(`Deleted trip ${t.title}`);
+                              setTimeout(() => setMsg(''), 2000);
+                            } catch (err) {
+                              console.error(err);
+                              setErr(err?.message || 'Failed to delete trip.');
+                            }
                           }}
                         >
                           Delete
