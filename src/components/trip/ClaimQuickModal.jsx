@@ -47,6 +47,7 @@ export default function ClaimQuickModal({ open, onClose, onSubmitted, trip, memb
 
     const newClaim = createClaim({
       tripId: trip.id,
+      tripShortId: trip.shortId,
       tripTitle: trip.title,
       memberId: selected.id ?? selected.member_id,
       memberName:

@@ -385,7 +385,6 @@ function startEdit() {
                   {statusLabel}
                 </span>
                 {status === 'ready'   && <span className="badge bg-agf1 text-white">Covered</span>}
-                {status === 'pending' && <span className="badge bg-melon">Pending</span>}
               </div>
               <div className="small text-muted mt-1">
                 {email || '—'}{(email && phone) ? ' • ' : ''}{phone || ''}
@@ -643,6 +642,7 @@ const [pendingCount, setPendingCount] = useState(0);
   const hasStarted = trip ? (new Date(trip.startDate) <= new Date()) : false
   const [paymentTip, setPaymentTip] = useState(false);
   const [claimsTip, setClaimsTip] = useState(false);
+  const [refundTip, setRefundTip] = useState(false);
   const tour = useTour();
 const { completeStep: completeTourStep, disableTour, enableTour } = tour;
   const tripTourOrder = ['paymentSummary', 'claims', 'spotOverview', 'readyRoster', 'pendingCoverage'];
@@ -729,6 +729,18 @@ const displayReady = searchActive ? filteredReady : ready;
 const displayPending = searchActive ? filteredPending : pending;
 const displayCoveredCount = searchActive ? displayReady.length : coveredCount;
 const displayPendingCount = searchActive ? displayPending.length : pendingCount;
+const standbyList = useMemo(
+  () => displayPending.filter((m) => m.active === false),
+  [displayPending]
+);
+const awaitingPayment = useMemo(
+  () => displayPending.filter((m) => m.active !== false && isEligibleMember(m)),
+  [displayPending]
+);
+const awaitingConfirmation = useMemo(
+  () => displayPending.filter((m) => m.active !== false && !isEligibleMember(m)),
+  [displayPending]
+);
 
 
 async function openClaim() {
@@ -1758,14 +1770,14 @@ function onEditMember(memberId) {
               </div>
               <div className="card-body">
                 {paymentTip ? (
-                  <TourCallout
-                    title="How payments work"
-                    description="Confirmed travelers drive the balance. Credits mint seats; pay here to create seats you can assign to travelers."
-                    stepLabel={tourStepLabel}
-                    onDismiss={() => setPaymentTip(false)}
-                    dismissLabel="Close"
-                    showTurnOff={false}
-                  />
+                <TourCallout
+                  title="How payments work"
+                  description="Confirmed travelers drive the balance. Pay or apply credit here to cover them; once covered they move into Ready and Covered."
+                  stepLabel={tourStepLabel}
+                  onDismiss={() => setPaymentTip(false)}
+                  dismissLabel="Close"
+                  showTurnOff={false}
+                />
                 ) : (
                   <>
                     {balanceAlert && (
@@ -1885,6 +1897,9 @@ function onEditMember(memberId) {
                 </button>
               </div>
               <div className="card-body">
+                <p className="small text-muted">
+                  When something doesn’t go as planned, that’s why we’re here.
+                </p>
                 {claimsTip ? (
                   <TourCallout
                     title="Claims and refunds"
@@ -1981,19 +1996,39 @@ function onEditMember(memberId) {
             </div>
 
             {/* Refunds Card */}
-            <div className="card mt-3">
-              <div className="card-header fw-bold bg-dark text-white">Refunds</div>
-              <div className="card-body">
-                <p className="small text-muted mb-3">
-                  Refunds return unused trip credits after the itinerary has started. Use this if a covered traveler can no longer go.
-                </p>
-                <button
-                  className="btn btn-outline-success w-100"
-                  disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
-                  onClick={refundAllCredits}
-                >
-                  {refunding ? 'Processing…' : `Request refund ${cents(refundDue)}`}
-                </button>
+          <div className="card mt-3">
+            <div className="card-header fw-bold bg-dark text-white d-flex justify-content-between align-items-center">
+              <span>Refunds</span>
+              <button
+                type="button"
+                className="btn btn-sm btn-link text-white text-decoration-none p-0"
+                onClick={() => setRefundTip(t => !t)}
+                aria-label="Toggle refunds tip"
+              >
+                <i className="bi bi-question-circle" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div className="card-body">
+              {refundTip && (
+                <TourCallout
+                  title="Refunds"
+                  description="When the trip has started, you can return unused credit here. Ready travelers stay covered; only unused credit is refunded."
+                  stepLabel={tourStepLabel}
+                  onDismiss={() => setRefundTip(false)}
+                  dismissLabel="Close"
+                  showTurnOff={false}
+                />
+              )}
+              <p className="small text-muted mb-3">
+                Refunds return unused trip credits after the itinerary has started. Use this if a covered traveler can no longer go.
+              </p>
+              <button
+                className="btn btn-outline-success w-100"
+                disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
+                onClick={refundAllCredits}
+              >
+                {refunding ? 'Processing…' : `Request refund ${cents(refundDue)}`}
+              </button>
                 <p className="small text-center mt-2 mb-0">
                   Refunds can be initiated after the first date of the trip.
                 </p>
@@ -2015,13 +2050,10 @@ function onEditMember(memberId) {
         <div className="col-lg-8 d-flex flex-column gap-3">
           <TripMembersList
             ready={displayReady}
-            pending={displayPending.filter(m => m.active !== false)}
-            standby={pending.filter(m => m.active === false)}
-            overviewReady={ready}
-            overviewPending={pending}
+            awaitingPayment={awaitingPayment}
+            awaitingConfirmation={awaitingConfirmation}
+            standby={standbyList}
             coveredCount={displayCoveredCount}
-            pendingCount={displayPending.filter(m => m.active !== false).length}
-            standbyCount={pending.filter(m => m.active === false).length}
             unassignedSpots={unassignedSpots}
             spotAddOpen={spotAddOpen}
             onSpotAddToggle={setSpotAddOpen}

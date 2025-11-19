@@ -15,26 +15,32 @@ export default function InlineNotice({
   children
 }) {
   const [open, setOpen] = useState(true);
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     if (!timeoutMs) return;
-    const id = setTimeout(() => setOpen(false), timeoutMs);
+    const id = setTimeout(() => triggerClose(), timeoutMs);
     return () => clearTimeout(id);
   }, [timeoutMs]);
+
+  const triggerClose = () => {
+    setClosing(true);
+    setTimeout(() => setOpen(false), 180);
+  };
 
   if (!open) return null;
 
   const toneClass = toneStyles[tone] || toneStyles.info;
 
   return (
-    <div className={`agf-alert ${toneClass} ${className}`} role="status">
+    <div className={`agf-alert ${toneClass} ${closing ? 'agf-alert-closing' : ''} ${className}`} role="status">
       <div className="agf-alert__body">{children}</div>
       {dismissible && (
         <button
           type="button"
           className="agf-alert__close"
           aria-label="Close message"
-          onClick={() => setOpen(false)}
+          onClick={triggerClose}
         >
           ×
         </button>

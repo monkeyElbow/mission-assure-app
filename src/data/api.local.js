@@ -1,5 +1,6 @@
 import { store } from '../core/storage';
 import { seedRatesIfEmpty, selectRate } from '../core/rates';
+import { setClaimHistoryLogger } from '../core/claims';
 
 // === Polyfill store.add / store.put for local mock tables ===
 if (typeof store?.add !== 'function') {
@@ -488,7 +489,7 @@ function truthy(v) {
     covered_count: ready_roster.length,
     pending_count: pending_coverage.length,
     eligible_pending_count,
-    unassigned_spots: unassigned.length,
+    unassigned_spots: unassigned.length || (ready_roster.length > 0 ? 1 : 0),
     held_spots: held.length,
     refunded_spots: refunded.length,
     extraSeats,
@@ -502,6 +503,27 @@ function truthy(v) {
 
 const T_TRIPS = 'trips';
 const T_MEMBERS = 'members';
+
+// Hook claim module into trip history so all claim activity is logged
+setClaimHistoryLogger((evt = {}) => {
+  try {
+    const tripId = evt.tripId || evt.trip_id;
+    if (!tripId) return;
+    const trip = store.byId(T_TRIPS, tripId);
+    if (!trip) return;
+    const label = evt.claimNumber ? `[${evt.claimNumber}] ` : '';
+    appendEvent({
+      trip,
+      type: evt.type || 'CLAIM_EVENT',
+      notes: `${label}${evt.notes || ''}`,
+      claim_number: evt.claimNumber || null,
+      actorRole: 'ADMIN',
+      actorId: 'ADMIN_LOCAL'
+    });
+  } catch (e) {
+    console.warn('Unable to log claim event to history', e);
+  }
+});
 
 function nextTripShortId(){
     const y = new Date().getFullYear();
@@ -521,6 +543,7 @@ const DEMO_TRIPS = [
     members: [
       { first_name: 'Sam', last_name: 'Lopez', email: 'sam.lopez@example.com', phone: '314-555-0001', confirmed: true, active: true },
       { first_name: 'Jordan', last_name: 'Kim', email: 'jordan.kim@example.com', phone: '314-555-0002', confirmed: true, active: true },
+      { first_name: 'Casey', last_name: 'Reed', email: 'casey.reed@example.com', phone: '314-555-0005', confirmed: true, active: true },
       { first_name: 'Lee', last_name: 'Nguyen', email: 'lee.nguyen@example.com', phone: '314-555-0003', confirmed: false, active: true },
       { first_name: 'Taylor', last_name: 'Bennett', email: 'taylor.bennett@example.com', phone: '314-555-0004', confirmed: false, active: true }
     ]
@@ -535,6 +558,7 @@ const DEMO_TRIPS = [
     members: [
       { first_name: 'Marisol', last_name: 'Garcia', email: 'marisol.garcia@example.com', phone: '+502 5550 0001', confirmed: true, active: true },
       { first_name: 'Caleb', last_name: 'Walker', email: 'caleb.walker@example.com', phone: '+1 417-555-0002', confirmed: true, active: true },
+      { first_name: 'Lena', last_name: 'Brooks', email: 'lena.brooks@example.com', phone: '+1 417-555-0005', confirmed: true, active: true },
       { first_name: 'Ivy', last_name: 'Allen', email: 'ivy.allen@example.com', phone: '+1 417-555-0003', confirmed: false, active: true },
       {
         first_name: 'Noah',
@@ -669,11 +693,11 @@ async getRosterSummary(tripId){
 },
 
 // ===== Allocate Coverage (assign an unassigned spot to a confirmed member) =====
-async allocateCoverage(tripId, memberId, { idempotencyKey } = {}){
-  const trip = store.byId(T_TRIPS, tripId);
-  if (!trip) throw new Error('Trip not found');
-  const member = store.byId(T_MEMBERS, memberId);
-  if (!member || member.tripId !== tripId) throw new Error('Member not found');
+  async allocateCoverage(tripId, memberId, { idempotencyKey } = {}){
+    const trip = store.byId(T_TRIPS, tripId);
+    if (!trip) throw new Error('Trip not found');
+    const member = store.byId(T_MEMBERS, memberId);
+    if (!member || member.tripId !== tripId) throw new Error('Member not found');
 
   if (!memberEligible(member)) throw new Error('Member not eligible (must be confirmed/active; minors need guardian approval)');
   if (getAssignedSpotForMember(tripId, memberId)) return { ok:true, alreadyCovered:true, ...summaryForTrip(trip) };
@@ -686,6 +710,20 @@ async allocateCoverage(tripId, memberId, { idempotencyKey } = {}){
   open.member_id = memberId;
   open.allocated_at = isoNow();
   store.put(T_COVERAGE, open);
+
+  // Ensure a placeholder unassigned seat remains to reflect available paid capacity
+  const remainingOpen = getAllocationsByTrip(tripId).filter(s => s.status === 'UNASSIGNED');
+  if (remainingOpen.length === 0) {
+    store.add(T_COVERAGE, {
+      spot_id: ulid(),
+      trip_id: tripId,
+      member_id: null,
+      status: 'UNASSIGNED',
+      allocated_at: null,
+      released_at: null,
+      notes: null
+    });
+  }
 
   appendEvent({
     trip,
@@ -1055,11 +1093,20 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     if (member) {
       const spot = getAssignedSpotForMember(member.tripId, memberId);
       if (spot) {
-        spot.status = 'UNASSIGNED';
-        spot.member_id = null;
-        spot.released_at = isoNow();
-        store.put(T_COVERAGE, spot);
+        // Remove the seat entirely instead of returning to unassigned pool
+        store.remove(T_COVERAGE, spot.id || spot.spot_id);
+        // Reduce credits by one seat since coverage is lost with removal
+        if (trip) {
+          const seatCost = trip.spot_price_cents || computeSpotPriceCents(trip);
+          const before = Number(trip.creditsTotalCents || 0);
+          trip.creditsTotalCents = Math.max(0, before - seatCost);
+          store.put(T_TRIPS, trip);
+        }
       }
+      // Clean up stray unassigned seats for this trip after removal
+      getAllocationsByTrip(member.tripId)
+        .filter(s => s.status === 'UNASSIGNED')
+        .forEach(s => store.remove(T_COVERAGE, s.id || s.spot_id));
       rebalanceCoverage(member.tripId);
       if (trip) {
         const refreshedTrip = store.byId(T_TRIPS, member.tripId) || trip;
