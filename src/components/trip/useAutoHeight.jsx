@@ -21,7 +21,6 @@ export function useAutoHeight(isOpen) {
       // 1) lock current height
       el.style.height = el.scrollHeight + "px";
       // 2) force reflow so the browser registers the height before setting 0
-      // eslint-disable-next-line no-unused-expressions
       el.offsetHeight; 
       // 3) now animate to 0
       el.style.height = "0px";

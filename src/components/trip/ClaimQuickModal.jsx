@@ -45,14 +45,17 @@ export default function ClaimQuickModal({ open, onClose, onSubmitted, trip, memb
     if (!incidentDate) { alert('Add the incident date.'); return; }
     if (!description.trim()) { alert('Add a brief description.'); return; }
 
+    const memberFirstName = selected.firstName || selected.first_name || ''
+    const memberLastName = selected.lastName || selected.last_name || ''
     const newClaim = createClaim({
       tripId: trip.id,
       tripShortId: trip.shortId,
       tripTitle: trip.title,
       memberId: selected.id ?? selected.member_id,
-      memberName:
-        `${selected.firstName || selected.first_name || ''} ${selected.lastName || selected.last_name || ''}`.trim() ||
-        selected.email,
+      memberFirstName,
+      memberLastName,
+      memberPhone: selected.phone || selected.phone_number || '',
+      memberName: `${memberFirstName} ${memberLastName}`.trim() || selected.email || 'Traveler',
       memberEmail: selected.email || '',
       reporterName: 'Leader',
       reporterEmail: '',

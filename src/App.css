@@ -126,12 +126,43 @@ p {
   font-style: normal;
 }
 
-a {
-  text-decoration: none;
-  color: var(--agf1);
+a:not(.btn) {
+  text-decoration: none !important;
+  color: var(--agf2) !important;
+  font-weight: 600;
 }
-footer a:hover {
+/* Keep main nav looking like an app menu, not hyperlinks */
+.navbar .nav-link {
+  font-weight: 500;
+  color: #3b4450 !important;
+}
+.navbar .nav-link:hover,
+.navbar .nav-link:focus {
+  color: var(--agf1) !important;
+}
+.navbar .nav-link.active {
+  color: var(--agf2) !important;
+  font-weight: 600;
+}
+.nav-link.demo-admin {
+  color: #555 !important;
+  font-style: italic;
+}
+.nav-link.demo-admin:hover,
+.nav-link.demo-admin:focus,
+.nav-link.demo-admin.active {
+  color: var(--agf1) !important;
+}
+footer a:not(.btn) {
+  font-weight: 600;
+}
+footer a:not(.btn):hover {
   text-decoration: underline;
+}
+button.btn-link {
+  color: var(--agf2) !important;
+  font-weight: 600;
+  text-decoration: none !important;
 }
 
 /* Claims buttons in Admin trips list */
@@ -198,10 +229,129 @@ footer a:hover {
   color: var(--agf2);
   border-color: var(--agf2);
 }
-.btn-outline-primary:hover {
-  color: white;
-  border-color: var(--melon);
-  background-color: var(--melon);
+.btn-outline-primary:hover,
+.btn-outline-primary:focus {
+  color: #fff;
+  border-color: var(--agf1);
+  background-color: var(--agf1);
+}
+.btn-outline-secondary:hover,
+.btn-outline-secondary:focus,
+.btn-outline-dark:hover,
+.btn-outline-dark:focus {
+  color: #fff !important;
+  background-color: var(--agf1) !important;
+  border-color: var(--agf1) !important;
+}
+.btn-outline-danger:hover,
+.btn-outline-danger:focus {
+  color: #fff !important;
+  background-color: #c0392b !important;
+  border-color: #c0392b !important;
+}
+.btn-group-tight > .btn:not(:first-child) {
+  margin-left: -1px;
+}
+
+/* Subtle hover lift + dim siblings in admin trip + claims lists */
+.admin-table tbody tr,
+.claims-table tbody tr {
+  position: relative;
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease, background-color 160ms ease;
+}
+.admin-table tbody:hover tr,
+.claims-table tbody:hover tr {
+  opacity: 0.9;
+}
+.admin-table tbody tr > td {
+  padding: 14px 16px;
+}
+.admin-table tbody tr:hover {
+  opacity: 1;
+  transform: scale(1.005);
+  z-index: 2;
+  /* vertical-only emphasis */
+  box-shadow:
+    0 10px 16px rgba(17, 24, 39, 0.12),
+    0 -6px 12px rgba(17, 24, 39, 0.06);
+  background-color: #f6f8fb;
+}
+.claims-table tbody tr:hover {
+  opacity: 1;
+  transform: scale(1.005);
+  z-index: 2;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.12);
+  background-color: #f6f8fb;
+}
+.admin-table tbody tr td:first-child,
+.claims-table tbody tr td:first-child {
+  border-top-left-radius: 14px;
+  border-bottom-left-radius: 14px;
+}
+.admin-table tbody tr td:last-child,
+.claims-table tbody tr td:last-child {
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+}
+.claims-table.claims-table--detail-open tbody:hover tr {
+  opacity: 1;
+}
+.claims-table.claims-table--detail-open tbody tr:hover {
+  transform: none;
+  box-shadow: none;
+  background-color: inherit;
+}
+
+/* Claims list on admin trip detail */
+.admin-claims-list > li {
+  position: relative;
+  border-radius: 14px;
+  background-color: #f8f9fa;
+  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease, background-color 160ms ease;
+  cursor: pointer;
+}
+.admin-claims-list:hover > li {
+  opacity: 0.9;
+}
+.admin-claims-list > li:hover {
+  opacity: 1;
+  transform: scale(1.005);
+  z-index: 1;
+  box-shadow: 0 8px 18px rgba(17, 24, 39, 0.12);
+  background-color: #f6f8fb;
+}
+
+/* Allow admin list hover scale without clipping buttons on the right */
+.admin-table-wrap {
+  overflow: visible !important;
+  padding-right: 8px;
+}
+
+/* Leader trip cards hover */
+.leader-trip-card {
+  border-radius: 14px;
+  background: linear-gradient(142deg, rgba(255,255,255,1) 50%, rgba(0,138,171,0.05) 100%);
+  border-right: 1.5px solid rgba(200,200,200,0.5) !important;
+  border-bottom: 1.5px solid rgba(200,200,200,0.5) !important;
+  border-left: 1.5px solid rgba(0,125,152,0.15) !important;
+  border-top: 1.5px solid rgba(0,125,152,0.15) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+  transform: translateZ(0);
+  transition:
+    transform 450ms ease-out,
+    box-shadow 450ms ease-out,
+    background-color 450ms ease-out;
+}
+.leader-trip-card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 10px rgba(0, 0, 0, 0.07);
+}
+
+/* Match rounding between trip list and claims list rows */
+.admin-table tbody tr,
+.claims-table tbody tr,
+.admin-claims-list > li {
+  border-radius: 14px;
 }
 
 /* Navbar colors (so links aren’t faint) */
@@ -332,13 +482,6 @@ footer a:hover {
   color: var(--sand);
 }
 
-
-.card {
-  transition: 2s ease;
-}
-.card:hover{
-  background: #f3f1ef;
-}
 
 .card.no-hover:hover{
   background: inherit;

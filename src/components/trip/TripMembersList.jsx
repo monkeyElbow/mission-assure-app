@@ -16,7 +16,6 @@ export default function TripMembersList({
   searchTerm = '',
   onSearchTermChange = () => {},
   searchActive = false,
-  onMemberFocus,
   renderReadyItem,
   renderPendingItem,
   renderStandbyItem,
@@ -61,7 +60,7 @@ export default function TripMembersList({
   return (
     <div className="d-flex flex-column gap-3">
       {rosterNotice && (
-        <InlineNotice tone="info" timeoutMs={4000} className="mb-0">
+        <InlineNotice tone="info" timeoutMs={null} className="mb-0">
           {rosterNotice}
         </InlineNotice>
       )}
@@ -167,7 +166,7 @@ export default function TripMembersList({
                   </div>
                   <button
                     type="button"
-                    className="btn btn-sm btn-link text-decoration-none p-0"
+                    className="btn btn-sm btn-link text-decoration-none p-0 text-muted"
                     onClick={() => setReadyTip(v => !v)}
                     aria-label="Toggle ready roster tip"
                   >

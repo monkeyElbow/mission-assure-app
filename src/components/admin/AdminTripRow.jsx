@@ -2,7 +2,7 @@ import React from 'react'
 
 function fmt(d){ try{ return new Date(d).toLocaleDateString() } catch{ return d } }
 
-export default function AdminTripRow({ trip, onQuickEdit, onArchiveToggle, onSelectTrip }){
+export default function AdminTripRow({ trip, onArchiveToggle, onSelectTrip }){
   const statusBadge = (s)=>{
     const map = { LIVE:'bg-agf2', PAUSED:'bg-secondary', ARCHIVED:'bg-dark', DRAFT:'bg-info' }
     return <span className={`badge ${map[s]||'bg-secondary'}`}>{s}</span>

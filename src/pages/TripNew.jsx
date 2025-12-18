@@ -27,40 +27,42 @@ export default function TripNew(){
 
   return (
     <div className="container my-3" style={{maxWidth: 720}}>
-      <h1 className="h3 mb-3">New Trip</h1>
-      {err && (
-        <InlineNotice tone="danger" dismissible timeoutMs={5000} className="mb-3">
-          {err}
-        </InlineNotice>
-      )}
-      <form onSubmit={submit} className="row g-3">
-        <div className="col-12">
-          <label className="form-label">Title</label>
-          <input className="form-control" value={title} onChange={e=>setTitle(e.target.value)} />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">Start date</label>
-          <input type="date" className="form-control" value={startDate} onChange={e=>setStart(e.target.value)} />
-        </div>
-        <div className="col-md-6">
-          <label className="form-label">End date</label>
-          <input type="date" className="form-control" value={endDate} onChange={e=>setEnd(e.target.value)} />
-        </div>
-        <div className="col-12">
-          <label className="form-label me-3">Region</label>
-          <div className="form-check form-check-inline">
-            <input className="form-check-input" type="radio" id="reg-dom" name="region" value="DOMESTIC" checked={region==='DOMESTIC'} onChange={()=>setRegion('DOMESTIC')} />
-            <label className="form-check-label" htmlFor="reg-dom">Domestic</label>
+      <div className="card p-4 shadow-sm" style={{ borderRadius: 14 }}>
+        <h1 className="h3 mb-3">New Trip</h1>
+        {err && (
+          <InlineNotice tone="danger" dismissible timeoutMs={5000} className="mb-3">
+            {err}
+          </InlineNotice>
+        )}
+        <form onSubmit={submit} className="row g-3">
+          <div className="col-12">
+            <label className="form-label">Title</label>
+            <input className="form-control" value={title} onChange={e=>setTitle(e.target.value)} />
           </div>
-          <div className="form-check form-check-inline">
-            <input className="form-check-input" type="radio" id="reg-for" name="region" value="INTERNATIONAL" checked={region==='INTERNATIONAL'} onChange={()=>setRegion('INTERNATIONAL')} />
-            <label className="form-check-label" htmlFor="reg-for">International</label>
+          <div className="col-md-6">
+            <label className="form-label">Start date</label>
+            <input type="date" className="form-control" value={startDate} onChange={e=>setStart(e.target.value)} />
           </div>
-        </div>
-        <div className="col-12 d-flex gap-2">
-          <button className="btn btn-primary" type="submit">Create Trip</button>
-        </div>
-      </form>
+          <div className="col-md-6">
+            <label className="form-label">End date</label>
+            <input type="date" className="form-control" value={endDate} onChange={e=>setEnd(e.target.value)} />
+          </div>
+          <div className="col-12">
+            <label className="form-label me-3">Region</label>
+            <div className="form-check form-check-inline">
+              <input className="form-check-input" type="radio" id="reg-dom" name="region" value="DOMESTIC" checked={region==='DOMESTIC'} onChange={()=>setRegion('DOMESTIC')} />
+              <label className="form-check-label" htmlFor="reg-dom">Domestic</label>
+            </div>
+            <div className="form-check form-check-inline">
+              <input className="form-check-input" type="radio" id="reg-for" name="region" value="INTERNATIONAL" checked={region==='INTERNATIONAL'} onChange={()=>setRegion('INTERNATIONAL')} />
+              <label className="form-check-label" htmlFor="reg-for">International</label>
+            </div>
+          </div>
+          <div className="col-12 d-flex gap-2">
+            <button className="btn btn-primary" type="submit">Create Trip</button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

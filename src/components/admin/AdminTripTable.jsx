@@ -1,7 +1,7 @@
 import React from 'react'
 import AdminTripRow from './AdminTripRow'
 
-export default function AdminTripTable({ trips, onQuickEdit, onArchiveToggle, onUnarchive, onSelectTrip }){
+export default function AdminTripTable({ trips, onArchiveToggle, onSelectTrip }){
   return (
     <div className="card">
       <div className="card-header fw-semibold">All Trips</div>
@@ -19,7 +19,7 @@ export default function AdminTripTable({ trips, onQuickEdit, onArchiveToggle, on
           </thead>
           <tbody>
             {trips.map(t => (
-              <AdminTripRow key={t.id} trip={t} onQuickEdit={onQuickEdit} onArchiveToggle={onArchiveToggle} onSelectTrip={onSelectTrip}/>
+              <AdminTripRow key={t.id} trip={t} onArchiveToggle={onArchiveToggle} onSelectTrip={onSelectTrip}/>
             ))}
           </tbody>
         </table>

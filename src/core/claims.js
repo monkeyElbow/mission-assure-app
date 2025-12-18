@@ -29,6 +29,9 @@ export function createClaim(data){
   const now = new Date().toISOString();
   const tripShort = data.tripShortId || data.tripShort || data.shortId || (data.tripId ? String(data.tripId).slice(-6) : '');
   const prefix = tripShort ? `CLM-${tripShort}` : 'CLM';
+  const firstName = data.memberFirstName || '';
+  const lastName = data.memberLastName || '';
+  const combinedName = data.memberName || `${firstName} ${lastName}`.trim() || data.memberEmail || 'Traveler';
   const row = {
     id: crypto.randomUUID(),
     claimNumber: nextNumber(prefix),
@@ -39,8 +42,12 @@ export function createClaim(data){
     freshForAdmin: true,
     freshForLeader: false,
     createdAt: now, updatedAt: now,
+    ...data,             // tripId, tripTitle, provided fields
     incidentDescription: data.incidentDescription || data.description || '',
-    ...data              // tripId, tripTitle, memberName/email, reporterName/email, incident*
+    memberFirstName: firstName,
+    memberLastName: lastName,
+    memberName: combinedName,
+    memberPhone: data.memberPhone || '',
   };
   ensureFlags(row);
   const rows = all(); rows.push(row); save(rows);
@@ -165,4 +172,10 @@ export function markClaimSeen(id, role='ADMIN'){
   rows[i] = row;
   save(rows);
   return row;
+}
+
+export function removeClaimsForTrip(tripId){
+  if (!tripId) return;
+  const kept = all().filter(c => c.tripId !== tripId);
+  save(kept);
 }

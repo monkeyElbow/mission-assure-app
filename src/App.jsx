@@ -6,6 +6,7 @@ import TripNew from './pages/TripNew.jsx'
 import TripDetail from './pages/TripDetail.jsx'
 import Claims from './pages/Claims.jsx'
 import Admin from './pages/Admin.jsx'
+import AdminTrip from './pages/AdminTrip.jsx'
 import NotFound from './pages/NotFound.jsx'
 import FAQ from './pages/FAQ.jsx'
 import DevPlaybook from './pages/DevPlaybook.jsx'
@@ -33,6 +34,7 @@ export default function App(){
         <Route path="claims" element={<Claims />} />
         <Route path="faq" element={<FAQ />} />
         <Route path="admin" element={<Admin />} />
+        <Route path="admin/trips/:id" element={<AdminTrip />} />
         <Route path="dev" element={<DevPlaybook />} />
         <Route path="*" element={<NotFound />} />
       </Route>

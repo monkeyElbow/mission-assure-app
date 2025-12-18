@@ -18,7 +18,6 @@ export default function Footer(){
           <ul className="list-unstyled m-0 fw-bold">
             <li><Link className="" to="/">Dashboard</Link></li>
             <li><Link className="" to="/newtrip">New Trip</Link></li>
-            <li><Link className="" to="/claims">Claims</Link></li>
             <li><Link className="" to="/faq">FAQ</Link></li>
           </ul>
         </div>

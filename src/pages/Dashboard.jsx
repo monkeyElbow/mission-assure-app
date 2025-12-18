@@ -10,6 +10,8 @@ import { Container, Card, Row, Col } from 'react-bootstrap';
 import AppLogoIntro from '../ui/AppLogoIntro';
 import TourCallout from '../components/tour/TourCallout.jsx';
 
+const motionRef = motion; void motionRef; // satisfy lint without react JSX plugin
+
 // ---- helpers ----
 const cents = (n = 0) =>
   (n / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' });
@@ -17,10 +19,12 @@ const cents = (n = 0) =>
 function buildMeta(trip) {
   const members = Array.isArray(trip?.members) ? trip.members : [];
   const isConfirmed = (m) => (m.isMinor ? m.guardianApproved : m.confirmed);
+  const isPending = (m) => !isConfirmed(m);
 
   const memberCount = members.length;
   const confirmedCount = members.filter(isConfirmed).length;
   const unconfirmedCount = Math.max(0, memberCount - confirmedCount);
+  const pendingCount = members.filter(isPending).length;
 
   const days = daysInclusive(trip.startDate, trip.endDate) || 0;
   const rateCents = trip?.rateCents || 0;
@@ -46,6 +50,7 @@ function buildMeta(trip) {
     balanceDueCents,
     status,
     canPayNow,
+    pendingCount,
   };
 }
 
@@ -55,6 +60,7 @@ function TripCard({ t, meta = {} }) {
     memberCount = 0,
     confirmedCount = 0,
     unconfirmedCount = 0,
+    pendingCount = 0,
     balanceDueCents = 0,
     status = 'SETUP',
   } = meta;
@@ -64,10 +70,10 @@ function TripCard({ t, meta = {} }) {
 
   return (
     <motion.div className="h-100" layout>
-      <Card className={`p-4 h-100 ${isArchived ? 'archived-card' : ''}`}>
-        <h2 className="h4 mb-3">{t.title}</h2>
-        <Row className="g-3 align-items-start">
-          <Col md={8} className="d-flex flex-column gap-2">
+      <Card className={`leader-trip-card p-4 h-100 position-relative ${isArchived ? 'archived-card' : ''}`}>
+        <h2 className="h4 mb-2">{t.title}</h2>
+        <Row className="g-2 align-items-start">
+          <Col md={12} className="d-flex flex-column gap-2">
             <div className="d-flex flex-wrap align-items-center gap-2">
               {t.shortId && <span className="fw-semibold text-muted small">#{t.shortId}</span>}
               <span className="badge bg-dark small">{t.region}</span>
@@ -76,75 +82,59 @@ function TripCard({ t, meta = {} }) {
               <span>{t.startDate} → {t.endDate}</span>
               <span className="badge bg-light text-dark border">{days} days</span>
             </div>
-            <div className="small text-muted lh-sm">
+            <div className="d-flex flex-wrap align-items-center gap-2 small text-muted lh-sm">
               <span
                 className="badge bg-light fw-semibold"
                 style={{ color: 'var(--agf1)', border: '1px solid var(--agf1)' }}
               >
                 {confirmedCount}/{memberCount} confirmed
               </span>
+              {!isArchived && (
+                <>
+                  <span className="badge bg-agf1 text-white">Ready: {confirmedCount}</span>
+                  {pendingCount > 0 && (
+                    <span className="badge bg-warning text-dark">Pending: {pendingCount}</span>
+                  )}
+                </>
+              )}
+              {!isArchived && status === 'DUE' && (
+                <motion.span
+                  key="due"
+                  className="badge bg-melon text-dark"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  Pay {cents(balanceDueCents)}
+                </motion.span>
+              )}
+              <AnimatePresence>
+                {!isArchived && unconfirmedCount > 0 && (
+                  <motion.span
+                    key={`unconf-${unconfirmedCount}`}
+                    className="badge bg-melon"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    {unconfirmedCount} unconfirmed
+                  </motion.span>
+                )}
+              </AnimatePresence>
+              {isArchived && <span className="badge text-bg-secondary">ARCHIVED</span>}
+              {!isArchived && memberCount === 0 && (
+                <span className="badge text-bg-light text-muted">Ready to add people</span>
+              )}
             </div>
-            <div className="d-flex gap-2 mt-2">
-              <Link to={`/trips/${t.id}`} className="btn btn-sm btn-primary stretched-link">
+            <div className="pt-3 mt-2 border-top text-center">
+              <Link to={`/trips/${t.id}`} className="btn btn-sm btn-primary px-4 stretched-link">
                 Open
               </Link>
             </div>
           </Col>
-          <Col md={4} className="d-flex">
-            <div className="status-panel w-100 d-flex flex-column flex-grow-1 gap-2 px-3 py-2">
-              <span className="text-uppercase small status-label text-muted">Status</span>
-              <div className="d-flex flex-column gap-2 mt-1">
-            {!isArchived && status === 'DUE' && (
-              <motion.span
-              key="due"
-              className="badge bg-melon text-dark"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              >
-                Pay {cents(balanceDueCents)}
-              </motion.span>
-            )}
-            {!isArchived && status === 'READY' && (
-              <motion.span
-              key="ready"
-              className="badge bg-agf1"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18 }}
-              >
-                Ready
-              </motion.span>
-            )}
-          <AnimatePresence>
-            {!isArchived && unconfirmedCount > 0 && (
-              <motion.span
-              key={`unconf-${unconfirmedCount}`}
-              className="badge bg-melon"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.18 }}
-              >
-                {unconfirmedCount} unconfirmed
-              </motion.span>
-            )}
-          </AnimatePresence>
-
-            {isArchived && (
-              <span className="badge text-bg-secondary">ARCHIVED</span>
-            )}
-            {!isArchived && memberCount === 0 && (
-              <span className="badge text-bg-light text-muted">Ready to add people</span>
-            )}
-              </div>
-            </div>
-          </Col>
         </Row>
-
-        
       </Card>
     </motion.div>
   );
@@ -279,7 +269,7 @@ const handleIntroDone = useCallback(() => setIntroDone(true), []);
               <motion.div key={t.id} 
               {...fadeSlide} 
               transition={{ ...(fadeSlide.transition || {}), delay: i * 0.18 }} 
-              className="col-md-6">
+              className="col-md-4">
 
                 <TripCard t={t} meta={metaByTrip[t.id]} />
 

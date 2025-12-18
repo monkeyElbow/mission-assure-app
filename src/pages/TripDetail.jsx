@@ -9,7 +9,7 @@ import ClaimQuickModal from '../components/trip/ClaimQuickModal.jsx'
 import { listClaims } from '../core/claims.js'
 import MemberConfirmModal from '../components/trip/MemberConfirmModal.jsx'
 import GuardianApprovalModal from '../components/trip/GuardianApprovalModal.jsx'
-import { coverageSummary } from '/src/core/coverage'
+import { buildReceiptSnapshot, renderReceiptHTML } from '../core/receipt.js'
 import { useTour } from '../core/TourContext.jsx'
 import TourCallout from '../components/tour/TourCallout.jsx'
 import InlineNotice from '../components/InlineNotice.jsx'
@@ -810,8 +810,10 @@ async function load(showSpinner = true){
   // If you have credits in local storage, swap this for your real calculator:
   const credit = trip?.creditsTotalCents || 0
   const balanceDue = Math.max(0, subtotal - credit)
-  const tripEnded = trip ? new Date(trip.endDate) < new Date() : false
-  const refundDue = tripEnded ? Math.max(0, credit - subtotal) : credit
+  const refundDue = useMemo(
+    () => (canRefund ? Math.max(0, refundableAmount) : 0),
+    [canRefund, refundableAmount]
+  )
 
   useEffect(() => {
     const prev = balancePrevRef.current;
@@ -1375,68 +1377,6 @@ async function handleMoveToStandby(memberSummary) {
 
     
 
- // ---- Receipt helpers ----
-// const cents = (n = 0) =>
-//   (n / 100).toLocaleString(undefined, { style: "currency", currency: "USD" });
-
-const fmtDate = (s) => (s ? new Date(s).toLocaleDateString() : "");
-const fmtDateTime = (d) => new Date(d).toLocaleString();
-
-function escapeHtml(s = "") {
-  return String(s)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
-}
-
-// Build the snapshot from current trip state
-function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null } = {}) {
-  const members = Array.isArray(trip?.members) ? trip.members : [];
-  const isConfirmed = (m) => (m.isMinor ? m.guardianApproved : m.confirmed);
-
-  const confirmedMembers   = members.filter(m => isConfirmed(m) && (m.active !== false));
-  const unconfirmedMembers = members.filter(m => !isConfirmed(m) && (m.active !== false));
-
-  const cov = coverageSummary(trip, members);
-const coveredIdsArray = [...cov.coveredIds]; // plain array safe for JSON/templating
-const coveredMembers = members.filter(m => cov.coveredIds.has(m.id));
-  const notCoveredMembers = members.filter(m => !cov.coveredIds.has(m.id));
-
-  const subtotalCents = (trip?.rateCents || 0) *
-                        (typeof daysInclusive === 'function' ? daysInclusive(trip?.startDate, trip?.endDate) : 0) *
-                        coveredMembers.length;
-
-  const creditsCents = trip?.creditsTotalCents ?? 0;
-  const balanceDue   = Math.max(0, subtotalCents - creditsCents);
-
-
-
-
-  return {
-    tripId: trip?.shortId || trip?.id,
-    title: trip?.title || "Mission Assure Trip",
-    region: trip?.region === "INTERNATIONAL" ? "International" : "Domestic",
-    startDate: trip?.startDate, endDate: trip?.endDate,
-    membersCount: members.length,
-    confirmedMembers,
-    unconfirmedMembers,
-
-    coveredCount: cov.coveredCount,
-    coveredIds: coveredIdsArray,   // names list filter in HTML
-    coveredMembers,                // convenience: already filtered objects
-    notCoveredMembers,
-
-
-    subtotalCents, creditsCents, balanceDue,
-    paymentCents,                          // amount paid “today” (optional)
-    totalPaidToDateCents: creditsCents,    // show total paid to date
-    generatedAt: new Date(), paidAt: paidAt || null,
-  };
-}
-
-
 function openReceiptPrintWindow(data) {
   const html = renderReceiptHTML(data);
   const w = window.open("", "print-receipt", "width=900,height=1100");
@@ -1448,157 +1388,6 @@ function openReceiptPrintWindow(data) {
   w.onload = () => setTimeout(() => w.print(), 150);
 }
 
-function renderReceiptHTML(snap) {
- 
-
-  const period = (snap.startDate || snap.endDate)
-    ? `${fmtDate(snap.startDate)} – ${fmtDate(snap.endDate)}`
-    : "Dates TBA";
-
-  const paidState = snap.balanceDue === 0
-    ? `Paid in full as of ${fmtDateTime(snap.generatedAt)}`
-    : `Partial payment on file as of ${fmtDateTime(snap.generatedAt)}`;
-
-  return `
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Receipt – ${escapeHtml(snap.title)}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    :root{ --agf1:#00A3B3; --agf2:#008AAB; --ink:#111; --muted:#666; --line:#e5e7eb; }
-    *{ box-sizing:border-box; }
-    body{ margin:24px; font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
-      color:var(--ink); }
-    .brand{ display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-    .brand .name{ font-weight:700; font-size:16px; color:var(--agf1); }
-    .header{ display:flex; justify-content:space-between; align-items:flex-start;
-      border-bottom:1px solid var(--line); padding-bottom:12px; margin-bottom:16px; }
-    .h1{ font-size:20px; margin:0; }
-    .muted{ color:var(--muted); }
-    .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .card{ border:1px solid var(--line); border-radius:8px; padding:12px; }
-    .row{ display:flex; justify-content:space-between; margin:4px 0; }
-    .hr{ border-top:1px solid var(--line); margin:10px 0; }
-    .paid-box{ border:2px solid var(--agf1); border-radius:10px; padding:12px; display:flex; gap:10px; align-items:center; margin-top:8px; }
-    .check{ width:18px; height:18px; color:var(--agf1); }
-    .mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; }
-    .legal{ margin-top:16px; font-size:12px; color:var(--muted); }
-    .small{ font-size:12px; }
-    .right{ text-align:right; }
-    @media print{ body{ margin:10mm; } a{ color:inherit; text-decoration:none; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div>
-      <div class="brand"><div class="name">AGFinancial – Mission Assure</div></div>
-      <h1 class="h1">Payment Receipt</h1>
-      <div class="muted">Trip <span class="mono">#${escapeHtml(String(snap.tripId || ""))}</span></div>
-    </div>
-    <div class="right small">
-      <div><strong>${escapeHtml(snap.title)}</strong></div>
-      <div>${escapeHtml(snap.region)} trip</div>
-      <div>${period}</div>
-      ${snap.leaderName ? `<div>Leader: ${escapeHtml(snap.leaderName)}</div>` : ""}
-      ${snap.leaderEmail ? `<div>${escapeHtml(snap.leaderEmail)}</div>` : ""}
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
-      <div class="row"><span class="muted">Subtotal</span><span>${cents(snap.subtotalCents)}</span></div>
-      <div class="row"><span class="muted">Credits (to date)</span><span>- ${cents(snap.creditsCents)}</span></div>
-      <div class="hr"></div>
-      <div class="row"><span><strong>Balance due</strong></span><span><strong>${cents(snap.balanceDue)}</strong></span></div>
-      <div class="paid-box">
-        <svg class="check" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
-        <div>
-          <div><strong>${paidState}</strong></div>
-
-          <div class="row"><span class="muted">Total paid to date</span><span>${cents(snap.totalPaidToDateCents)}</span></div>
-${
-  snap.paymentCents != null
-    ? `<div class="row"><span class="muted">Payment today</span><span>${cents(snap.paymentCents)}</span></div>`
-    : ''
-}
-
-
-
-          <div class="small muted">Participants covered as of this receipt: ${snap.coveredCount}</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div><strong>Receipt details</strong></div>
-      <div class="row"><span class="muted">Generated</span><span>${fmtDateTime(snap.generatedAt)}</span></div>
-      <div class="row"><span class="muted">Trip ID</span><span class="mono">${escapeHtml(String(snap.tripId || ""))}</span></div>
-      <div class="row"><span class="muted">Region</span><span>${escapeHtml(snap.region)}</span></div>
-      <div class="row"><span class="muted">Participants</span><span>${snap.coveredCount}</span></div>
-    </div>
-  </div>
-
-  <div class="card" style="margin-top:16px;">
-    <div>
-      <strong>${
-        (snap.notCoveredMembers && snap.notCoveredMembers.length > 0)
-          ? 'Participants at time of receipt'
-          : 'All participants covered at time of receipt'
-      }</strong>
-    </div>
-
-    <div style="margin-top:8px;">
-      <div class="small muted">COVERED (confirmed &amp; paid)</div>
-      <ul style="margin:6px 0 10px 18px;">
-        ${
-          (snap.coveredMembers && snap.coveredMembers.length > 0)
-            ? snap.coveredMembers
-                .map(m => {
-                  const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || '(Name unavailable)';
-                  return `<li>${escapeHtml(name)}</li>`;
-                })
-                .join('')
-            : '<li>None</li>'
-        }
-      </ul>
-    </div>
-
-    ${
-      (snap.notCoveredMembers && snap.notCoveredMembers.length > 0) ? `
-    <div style="margin-top:12px;">
-      <div class="small muted" style="color:#B00020;">
-        <strong>NOT COVERED on this receipt</strong>
-      </div>
-      <ul style="margin:6px 0 0 18px;">
-        ${
-          snap.notCoveredMembers
-            .map(m => {
-              const name = `${m.firstName || ''} ${m.lastName || ''}`.trim() || '(Name unavailable)';
-              return `<li>${escapeHtml(name)}</li>`;
-            })
-            .join('')
-        }
-      </ul>
-      <div class="small" style="margin-top:8px; color:#B00020;">
-        Legal notice: Individuals listed as “Not covered” are not insured under this receipt as of the time shown.
-        Coverage requires confirmation (and guardian approval for minors) plus sufficient payment before departure.
-      </div>
-    </div>
-    ` : ''
-    }
-  </div>
-
-
-  <div class="legal">
-    <strong>Important:</strong> This receipt confirms payment recorded as of ${fmtDateTime(snap.generatedAt)}.
-    Coverage applies to the participants on this receipt as of this date and time.
-    Add more people? Sign in at <span class="mono">missionassure.agfinancial.org</span> to purchase additional coverage before departure.
-  </div>
-</body>
-</html>`;
-}
 
 
 function onEditMember(memberId) {
@@ -2024,7 +1813,7 @@ function onEditMember(memberId) {
               </p>
               <button
                 className="btn btn-outline-success w-100"
-                disabled={(trip?.creditsTotalCents || 0) === 0 || refunding}
+                disabled={!canRefund || refundDue === 0 || refunding}
                 onClick={refundAllCredits}
               >
                 {refunding ? 'Processing…' : `Request refund ${cents(refundDue)}`}

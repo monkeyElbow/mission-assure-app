@@ -14,11 +14,6 @@ function storageSet(name, value){
   else memory.set(name, value);
 }
 
-function storageRemove(name){
-  if (hasLocalStorage) localStorage.removeItem(key(name));
-  else memory.delete(name);
-}
-
 function storageKeys(){
   if (hasLocalStorage) {
     const keys = [];

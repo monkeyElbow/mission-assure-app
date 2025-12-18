@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { store } from '../src/core/storage.js'
 import { api } from '../src/data/api.local.js'
+import { coverageSummary } from '../src/core/coverage.js'
+import { buildReceiptSnapshot, renderReceiptHTML } from '../src/core/receipt.js'
 
 function isoDate(offsetDays = 0) {
   const d = new Date()
@@ -86,5 +88,48 @@ describe('coverage/payments flows', () => {
     expect(types).toContain('MEMBER_UPDATED')
     expect(types).toContain('PAYMENT_APPLIED')
     expect(types).toContain('COVERAGE_ALLOCATED')
+  })
+})
+
+describe('receipt + coverage helpers', () => {
+  it('coverageSummary handles member_id identifiers', () => {
+    const trip = {
+      id: 'trip-1',
+      startDate: '2025-01-01',
+      endDate: '2025-01-03',
+      rateCents: 1000,
+      creditsTotalCents: 6000
+    }
+    const members = [
+      { member_id: 'm-1', confirmed: true, isMinor: false, firstName: 'Ready', lastName: 'One' },
+      { member_id: 'm-2', confirmed: false, isMinor: false, firstName: 'Pending', lastName: 'Two' }
+    ]
+    const summary = coverageSummary(trip, members)
+    expect(summary.coveredCount).toBe(1)
+    expect(summary.coveredIds.has('m-1')).toBe(true)
+  })
+
+  it('receipt snapshot lists covered and not-covered names', () => {
+    const trip = {
+      id: 'trip-2',
+      shortId: 'TRP-2',
+      title: 'Receipt Trip',
+      region: 'DOMESTIC',
+      startDate: '2025-02-01',
+      endDate: '2025-02-04',
+      rateCents: 1500,
+      creditsTotalCents: 12000,
+      members: [
+        { member_id: 'a1', confirmed: true, isMinor: false, firstName: 'Covered', lastName: 'Traveler' },
+        { member_id: 'b2', confirmed: false, isMinor: false, firstName: 'Pending', lastName: 'Guest' }
+      ]
+    }
+    const snap = buildReceiptSnapshot(trip)
+    expect(snap.coveredNames).toContain('Covered Traveler')
+    expect(snap.notCoveredNames.some(name => name.includes('Pending Guest'))).toBe(true)
+    const html = renderReceiptHTML(snap)
+    expect(html).toMatch(/Covered Traveler/)
+    expect(html).toMatch(/Pending Guest/)
+    expect(html).toMatch(/Unused credit/)
   })
 })

@@ -29,7 +29,7 @@ const subtotal = useMemo(
 
 const credit = useMemo(
   () => sumCredits(trip.id),
-  [trip.id, members.length, trip.rateCents, trip.startDate, trip.endDate]
+  [trip.id]
 )
 
 const balanceDue = Math.max(0, subtotal - credit)

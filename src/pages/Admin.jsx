@@ -9,6 +9,8 @@ import { fadeSlide } from '../ui/motion'
 import InlineNotice from '../components/InlineNotice.jsx'
 import { listClaims, updateClaim, addClaimNote, addClaimMessage, markClaimSeen } from '../core/claims'
 
+const motionRef = motion; void motionRef; // satisfy lint without react JSX plugin
+
 
 export default function Admin(){
   // ---- Trips state ----
@@ -51,6 +53,8 @@ export default function Admin(){
   const [drawerCoveredIds, setDrawerCoveredIds] = useState(new Set())
   const [sortField, setSortField] = useState('date') // date | claims | trip | members | payment | status
   const [sortDir, setSortDir] = useState('desc') // asc | desc
+  const [page, setPage] = useState(1)
+  const pageSize = 8
 const formatUsd = (cents = 0) => `$${(Number(cents || 0) / 100).toFixed(2)}`
 
   // member helpers (mirrors TripDetail logic lightly)
@@ -133,9 +137,9 @@ useEffect(()=>{
       setActiveClaim(null);
       setShowClaimDetail(false);
     }
-  }, [claims]);
+  }, [activeClaim, claims]);
 
-  const openClaimStatuses = new Set(['SUBMITTED','IN_REVIEW','MORE_INFO']);
+  const openClaimStatuses = useMemo(() => new Set(['SUBMITTED','IN_REVIEW','MORE_INFO']), []);
   const claimsByTrip = useMemo(() => {
     const map = new Map();
     claims.forEach(c => {
@@ -167,6 +171,8 @@ useEffect(()=>{
     trips.forEach(t => { c[t.status==='ARCHIVED' ? 'ARCHIVED' : 'ACTIVE']++ })
     return c
   }, [trips])
+
+  useEffect(() => { setPage(1); }, [q, scope, claimsOnlyTrips])
 
   const filteredTrips = useMemo(()=>{
     let rows = trips
@@ -234,6 +240,24 @@ useEffect(()=>{
 
     return sorted
   }, [trips, scope, q, claimsOnlyTrips, claimsByTrip, sortField, sortDir, membersByTrip, membersIndex])
+
+  const pagination = useMemo(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredTrips.length / pageSize));
+    const current = Math.min(page, totalPages);
+    const start = (current - 1) * pageSize;
+    return {
+      totalPages,
+      current,
+      start,
+      end: Math.min(filteredTrips.length, start + pageSize),
+      rows: filteredTrips.slice(start, start + pageSize)
+    };
+  }, [filteredTrips, page, pageSize]);
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(filteredTrips.length / pageSize));
+    if (page > totalPages) setPage(totalPages);
+  }, [filteredTrips.length, page, pageSize])
 
   function toggleSort(field){
     setSortDir(prevDir => {
@@ -365,8 +389,8 @@ useEffect(()=>{
       .filter(c => {
         if (!term) return true;
         const hay = [
-          c.claimNumber, c.tripTitle, c.tripId, c.memberName, c.memberEmail,
-          c.reporterName, c.reporterEmail, c.status, c.incidentType, c.incidentLocation
+          c.claimNumber, c.tripTitle, c.tripId, c.memberName, c.memberFirstName, c.memberLastName,
+          c.memberEmail, c.memberPhone, c.reporterName, c.reporterEmail, c.status, c.incidentType, c.incidentLocation
         ].filter(Boolean).join(' ').toLowerCase();
         return hay.includes(term);
       });
@@ -584,7 +608,7 @@ useEffect(()=>{
       )}
 
       {/* ---- Trips section ---- */}
-      <div className="card p-3 mb-4 no-hover">
+      <div className="card p-4 mb-4 no-hover" style={{ borderRadius: 14 }}>
         <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2">
           <h2 className="h5 mb-0">Trips</h2>
           <div className="d-flex flex-column flex-md-row gap-2 align-items-start align-items-md-center w-100" style={{maxWidth: 820}}>
@@ -622,8 +646,8 @@ useEffect(()=>{
           </div>
         </div>
 
-        <div className="table-responsive">
-          <table className="table table-sm align-middle mb-0 admin-table">
+        <div className="table-responsive admin-table-wrap">
+          <table className="table table-sm align-middle mb-0 admin-table" style={{ borderSpacing: '0 14px' }}>
             <thead>
               <tr>
                 <th>
@@ -656,7 +680,7 @@ useEffect(()=>{
             </thead>
             <tbody>
             <AnimatePresence>
-              {filteredTrips.map(t=>{
+              {pagination.rows.map(t=>{
                 const days = daysInclusive(t.startDate, t.endDate);
                 const isExpanded = drawerTripId === t.id;
                 const tripClaims = claimsForTrip(t.id);
@@ -679,12 +703,19 @@ useEffect(()=>{
                   textClass = 'text-warning';
                 }
 
+                const rowMotion = {
+                  initial: { opacity: 0 },
+                  animate: { opacity: 1 },
+                  exit: { opacity: 0 },
+                  transition: fadeSlide.transition,
+                };
+
                 return (
                   <React.Fragment key={t.id}>
-                    <motion.tr {...fadeSlide}>
-                      <td>
-                        <div className="fw-medium">
-                          <Link to={`/trips/${t.id}`} className="text-decoration-none">{t.title}</Link>
+                    <motion.tr {...rowMotion} style={{ background: '#f8f9fa' }}>
+                      <td className="align-middle">
+                        <div className="fw-medium mb-1">
+                          <Link to={`/admin/trips/${t.id}`} className="text-decoration-none">{t.title}</Link>
                           {t.shortId && <span className="text-muted smaller ms-2">#{t.shortId}</span>}
                         </div>
                         <div className="text-muted small d-flex align-items-center gap-2 flex-wrap">
@@ -692,7 +723,7 @@ useEffect(()=>{
                           <span>{t.startDate} → {t.endDate} ({days} days)</span>
                         </div>
                       </td>
-                      <td className="text-center">
+                      <td className="text-center align-middle">
                         <button
                           type="button"
                           className="btn btn-sm btn-outline-secondary"
@@ -702,7 +733,7 @@ useEffect(()=>{
                           {membersByTrip[t.id] || 0}
                         </button>
                       </td>
-                      <td className="text-center">
+                      <td className="text-center align-middle">
                         {(claimStats.total || 0) > 0 && (
                           <button
                             type="button"
@@ -716,7 +747,7 @@ useEffect(()=>{
                           </button>
                         )}
                       </td>
-                      <td>
+                      <td className="align-middle">
                         {t.paymentStatus === 'PAID' ? (
                           <span className="badge bg-agf2 text-white">PAID</span>
                         ) : (
@@ -735,71 +766,18 @@ useEffect(()=>{
                           </button>
                         )}
                       </td>
-                      <td>
+                      <td className="align-middle">
                         {t.status==='ARCHIVED'
                           ? <span className="badge text-bg-secondary">ARCHIVED</span>
                           : <span className="badge text-bg-primary-subtle" style={{ color: 'var(--agf2)' }}>ACTIVE</span>}
                       </td>
-                    <td className="text-end">
-                      <div className="btn-group btn-group-sm">
-                        <Link
-                          to={`/trips/${t.id}`}
-                          className="btn btn-outline-secondary d-flex align-items-center justify-content-center border-end-0"
-                          style={{ borderRightWidth: 0 }}
-                        >
-                          Open
-                        </Link>
-                        <button
-                          className="btn btn-outline-secondary d-flex align-items-center justify-content-center border-end-0"
-                          style={{ borderRightWidth: 0 }}
-                          onClick={()=>viewHistory(t)}
-                        >
-                          History
-                        </button>
-                        {t.paymentStatus!=='PAID' && (
-                          <button
-                            className="btn btn-outline-success d-flex align-items-center justify-content-center border-end-0"
-                            style={{ borderRightWidth: 0 }}
-                            onClick={()=>markPaid(t)}
-                          >
-                            Mark Paid
-                          </button>
-                        )}
-                        {t.status==='ARCHIVED' ? (
-                          <button
-                            className="btn btn-outline-primary d-flex align-items-center justify-content-center border-end-0"
-                            style={{ borderRightWidth: 0 }}
-                            onClick={()=>unarchive(t)}
-                          >
-                            Unarchive
-                          </button>
-                        ) : (
-                          <button
-                            className="btn btn-outline-secondary d-flex align-items-center justify-content-center border-end-0"
-                            style={{ borderRightWidth: 0 }}
-                            onClick={()=>archive(t)}
-                          >
-                            Archive
-                          </button>
-                        )}
-                        <button
-                          className="btn btn-outline-danger d-flex align-items-center justify-content-center"
-                          onClick={async ()=>{
-                            try {
-                              await api.deleteTrip(t.id);
-                              setTrips(ts => ts.filter(x => x.id !== t.id));
-                              setMembersByTrip(m => { const { [t.id]:_, ...rest } = m; return rest; });
-                              setMsg(`Deleted trip ${t.title}`);
-                              setTimeout(() => setMsg(''), 2000);
-                            } catch (err) {
-                              console.error(err);
-                              setErr(err?.message || 'Failed to delete trip.');
-                            }
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
+                    <td className="text-end align-middle">
+                      <Link
+                        to={`/admin/trips/${t.id}`}
+                        className="btn btn-outline-secondary btn-sm d-inline-flex align-items-center justify-content-center"
+                      >
+                        View
+                      </Link>
                     </td>
                     </motion.tr>
                     {isExpanded && (
@@ -978,10 +956,35 @@ useEffect(()=>{
             </tbody>
           </table>
         </div>
+        <div className="d-flex flex-wrap align-items-center justify-content-between mt-3 gap-2">
+          <div className="text-muted small">
+            Showing {filteredTrips.length === 0 ? 0 : pagination.start + 1}–{pagination.end} of {filteredTrips.length} trips
+          </div>
+          <div className="btn-group btn-group-sm" role="group">
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              disabled={pagination.current <= 1}
+              onClick={()=>setPage(p => Math.max(1, p-1))}
+            >
+              ← Prev
+            </button>
+            <span className="btn btn-outline-light text-dark disabled">
+              Page {pagination.current} / {pagination.totalPages}
+            </span>
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              disabled={pagination.current >= pagination.totalPages}
+              onClick={()=>setPage(p => Math.min(pagination.totalPages, p+1))}
+            >
+              Next →
+            </button>
+          </div>
+        </div>
       </div>
-
       {/* ---- Claims section ---- */}
-      <div className="card p-3 mb-4 no-hover">
+      <div className="card p-3 mb-4 no-hover"style={{ borderRadius: 14 }}>
         <div className="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-2">
           <h2 className="h5 mb-0">Claims</h2>
           <div className="d-flex flex-wrap gap-2 align-items-center">
@@ -1010,7 +1013,7 @@ useEffect(()=>{
           <div className="text-muted small">No claims found.</div>
         ) : (
           <div className="table-responsive">
-            <table className="table table-sm align-middle mb-0">
+            <table className="table table-sm align-middle mb-0 claims-table">
               <thead>
                 <tr>
                   <th style={{width:'18%'}}>Claim #</th>
@@ -1152,7 +1155,7 @@ useEffect(()=>{
         )}
       </div>
       {/* ---- Rates Manager ---- */}
-      <div className="card p-3 mb-4 no-hover">
+      <div className="card p-3 mb-4 no-hover" style={{ borderRadius: 14 }}>
         <div className="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
           <h2 className="h5 mb-0">Rates</h2>
           <div className="d-flex gap-2">
@@ -1260,7 +1263,7 @@ useEffect(()=>{
       </div>
 
       {/* ---- Reports ---- */}
-      <div className="card p-3 no-hover">
+      <div className="card p-3 no-hover" style={{ borderRadius: 14 }}>
         <div className="d-flex align-items-center justify-content-between">
           <h2 className="h5 mb-0">Reports</h2>
           <button className="btn btn-outline-secondary btn-sm"
