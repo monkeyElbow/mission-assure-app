@@ -3,6 +3,12 @@ import { store } from '../src/core/storage.js'
 import { api } from '../src/data/api.local.js'
 import { coverageSummary } from '../src/core/coverage.js'
 import { buildReceiptSnapshot, renderReceiptHTML } from '../src/core/receipt.js'
+import {
+  createClaim as createClaimRecord,
+  updateClaim as updateClaimRecord,
+  addClaimNote,
+  addClaimMessage
+} from '../src/core/claims.js'
 
 function isoDate(offsetDays = 0) {
   const d = new Date()
@@ -88,6 +94,78 @@ describe('coverage/payments flows', () => {
     expect(types).toContain('MEMBER_UPDATED')
     expect(types).toContain('PAYMENT_APPLIED')
     expect(types).toContain('COVERAGE_ALLOCATED')
+  })
+
+  it('history covers trip lifecycle actions', async () => {
+    const trip = await createBaseTrip()
+
+    await api.updateTrip(trip.id, { title: 'Updated Trip Title' })
+    await api.updateTrip(trip.id, { paymentStatus: 'PAID' })
+    await api.updateTrip(trip.id, { status: 'ARCHIVED' })
+
+    const [m1, m2] = await api.addMembers(trip.id, [{
+      firstName: 'Alex',
+      lastName: 'Hart',
+      email: 'alex@example.com'
+    }, {
+      firstName: 'Jordan',
+      lastName: 'Miles',
+      email: 'jordan@example.com'
+    }])
+
+    await api.updateMember(m1.id, { confirmed: true, isMinor: false })
+    await api.updateMember(m2.id, { confirmed: true, isMinor: false })
+
+    const { spot_price_cents: seatCost } = await api.getRosterSummary(trip.id)
+    await api.applyPayment(trip.id, seatCost * 2)
+
+    await api.allocateCoverage(trip.id, m1.id)
+    await api.releaseCoverage(trip.id, m1.id, { reason: 'Test release' })
+    await api.allocateCoverage(trip.id, m1.id)
+    await api.transferCoverage(trip.id, m1.id, m2.id)
+    await api.removeMember(m1.id)
+
+    await api.createClaim({
+      trip_id: trip.id,
+      member_id: m2.id,
+      incident_type: 'Illness',
+      description: 'Test incident',
+      incident_date: trip.startDate,
+      incident_location: 'Site'
+    })
+
+    const claimRow = createClaimRecord({
+      tripId: trip.id,
+      tripTitle: trip.title,
+      memberId: m2.id,
+      memberFirstName: 'Jordan',
+      memberLastName: 'Miles',
+      memberEmail: 'jordan@example.com',
+      reporterName: 'Leader'
+    })
+    updateClaimRecord(claimRow.id, { status: 'IN_REVIEW' })
+    addClaimNote(claimRow.id, 'Admin', 'Follow-up note')
+    addClaimMessage(claimRow.id, { authorRole: 'ADMIN', authorName: 'Admin', text: 'Message to leader' })
+
+    const history = await api.getTripHistory(trip.id)
+    const types = history.events.map(evt => evt.type)
+
+    expect(types).toContain('TRIP_CREATED')
+    expect(types).toContain('TRIP_UPDATED')
+    expect(types).toContain('TRIP_PAYMENT_STATUS_UPDATED')
+    expect(types).toContain('TRIP_STATUS_UPDATED')
+    expect(types).toContain('MEMBER_ADDED')
+    expect(types).toContain('MEMBER_UPDATED')
+    expect(types).toContain('MEMBER_REMOVED')
+    expect(types).toContain('PAYMENT_APPLIED')
+    expect(types).toContain('COVERAGE_ALLOCATED')
+    expect(types).toContain('COVERAGE_RELEASED')
+    expect(types).toContain('COVERAGE_TRANSFERRED')
+    expect(types).toContain('CLAIM_SUBMITTED')
+    expect(types).toContain('CLAIM_CREATED')
+    expect(types).toContain('CLAIM_STATUS_UPDATED')
+    expect(types).toContain('CLAIM_NOTE_ADDED')
+    expect(types).toContain('CLAIM_MESSAGE_ADDED')
   })
 })
 
