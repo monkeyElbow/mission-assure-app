@@ -230,16 +230,17 @@ export default function TripMembersList({
                     </div>
                   )}
                 </div>
-                {tourActiveStep === 'readyRoster' && (
-                  <TourCallout
-                    className="tour-flyout"
-                    title="Ready roster"
-                    description="Covered travelers appear here. Edit, release credit, or open a traveler to adjust their guardian or confirmation status."
-                    stepLabel={tourStepLabel}
-                    onDismiss={() => onTourDismiss('readyRoster')}
-                    onTurnOff={onTourTurnOff}
-                  />
-                )}
+              {tourActiveStep === 'readyRoster' && (
+                <TourCallout
+                  className="tour-flyout"
+                  title="Ready roster"
+                  description="Covered travelers appear here. Edit, release credit, or open a traveler to adjust their guardian or confirmation status."
+                  stepLabel={tourStepLabel}
+                  dismissLabel="Next"
+                  onDismiss={() => onTourDismiss('readyRoster')}
+                  onTurnOff={onTourTurnOff}
+                />
+              )}
               </div>
 
               <div className={`p-3 bg-light rounded-3 border ${tourDim}`}>
@@ -289,6 +290,7 @@ export default function TripMembersList({
                     title="Awaiting payment"
                     description="These travelers are eligible but need credit applied. Pay the balance or apply available credit to move them to Ready."
                     stepLabel={tourStepLabel}
+                    dismissLabel="Next"
                     onDismiss={() => onTourDismiss('pendingCoverage')}
                     onTurnOff={onTourTurnOff}
                   />
@@ -337,6 +339,7 @@ export default function TripMembersList({
                   title="Awaiting confirmation"
                   description="These travelers need confirmation or guardian approval before they can be covered."
                   stepLabel={tourStepLabel}
+                  dismissLabel="Next"
                   onDismiss={() => onTourDismiss('awaitingConfirmation')}
                   onTurnOff={onTourTurnOff}
                 />
@@ -387,6 +390,7 @@ export default function TripMembersList({
                     title="Standby"
                     description="Standby travelers are inactive and free their paid seat for someone else."
                     stepLabel={tourStepLabel}
+                    dismissLabel="Next"
                     onDismiss={() => onTourDismiss('standbyRoster')}
                     onTurnOff={onTourTurnOff}
                   />
@@ -417,6 +421,7 @@ export default function TripMembersList({
                   title="Add a traveler"
                   description="Finish the tour by adding a traveler so we can confirm and cover them."
                   stepLabel={tourStepLabel}
+                  dismissLabel="Dismiss"
                   onDismiss={() => onTourDismiss('addPerson')}
                   onTurnOff={onTourTurnOff}
                 />

@@ -1710,6 +1710,7 @@ function onEditMember(memberId) {
                 title="Review the payment summary"
                 description="This panel tracks confirmed travelers, day rate, credits, and balance due. Pay the balance when you’re ready to mint seats."
                 stepLabel={tourStepLabel}
+                dismissLabel="Next"
                 onDismiss={() => completeTourStep('paymentSummary')}
                 onTurnOff={disableTour}
               />
@@ -1875,6 +1876,7 @@ function onEditMember(memberId) {
                 title="Claims and refunds"
                 description="File a claim once the trip has started, and request refunds for unused credits. Both live here."
                 stepLabel={tourStepLabel}
+                dismissLabel="Next"
                 onDismiss={() => completeTourStep('claims')}
                 onTurnOff={disableTour}
               />
