@@ -600,8 +600,8 @@ const DEMO_TRIPS = [
   {
     title: 'Serve St. Louis',
     region: 'DOMESTIC',
-    startDate: '2025-06-05',
-    endDate: '2025-06-12',
+    startDate: '2026-06-05',
+    endDate: '2026-06-12',
     paymentStatus: 'PAID',
     coverSpots: 2,
     members: [
@@ -615,8 +615,8 @@ const DEMO_TRIPS = [
   {
     title: 'Guatemala Outreach',
     region: 'INTERNATIONAL',
-    startDate: '2025-08-02',
-    endDate: '2025-08-12',
+    startDate: '2026-08-02',
+    endDate: '2026-08-12',
     paymentStatus: 'PAID',
     coverSpots: 3,
     members: [
@@ -644,8 +644,8 @@ const DEMO_TRIPS = [
   {
     title: 'College Retreat',
     region: 'DOMESTIC',
-    startDate: '2025-10-18',
-    endDate: '2025-10-21',
+    startDate: '2026-10-18',
+    endDate: '2026-10-21',
     paymentStatus: 'UNPAID',
     coverSpots: 1,
     members: [
