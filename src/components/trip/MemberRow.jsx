@@ -59,7 +59,7 @@ export default function MemberRow({ member, onUpdate, onRemove }){
           <span className={`badge ${member.status?.confirmed ? 'bg-agf2 text-white' : 'bg-melon'}`}
                 role="button"
                 onClick={()=> setShowConfirm(true)}>
-            {member.status?.confirmed ? 'Confirmed' : 'Not Confirmed'}
+            {member.status?.confirmed ? 'Confirmed' : 'Unconfirmed'}
           </span>
           {member.type==='MINOR' && (
             <span className={`badge ${member.status?.guardianApproved ? 'bg-agf2 text-white' : 'bg-mango'}`}

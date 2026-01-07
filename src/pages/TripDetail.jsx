@@ -267,7 +267,7 @@ function startEdit() {
   const memberId = member.member_id ?? member.id ?? member.memberId;
   const statusLabel = isMinorLocal
     ? (guardianOk ? 'Guardian OK' : 'Guardian needed')
-    : (confirmedOk ? 'Confirmed' : 'Needs confirm');
+    : (confirmedOk ? 'Confirmed' : 'Unconfirmed');
   const statusBadgeClass = (isMinorLocal ? guardianOk : confirmedOk)
     ? 'bg-agf2 text-white'
     : 'bg-melon';
@@ -646,7 +646,15 @@ const [pendingCount, setPendingCount] = useState(0);
   const [refundTip, setRefundTip] = useState(false);
   const tour = useTour();
 const { completeStep: completeTourStep, disableTour, enableTour } = tour;
-  const tripTourOrder = ['paymentSummary', 'claims', 'spotOverview', 'readyRoster', 'pendingCoverage'];
+  const tripTourOrder = [
+    'paymentSummary',
+    'claims',
+    'readyRoster',
+    'pendingCoverage',
+    'awaitingConfirmation',
+    'standbyRoster',
+    'addPerson'
+  ];
   const activeTripStep = tour.enabled ? tripTourOrder.find(step => !tour.steps?.[step]) : null;
   const tripTourActive = tour.enabled && !!activeTripStep;
 
@@ -676,9 +684,43 @@ const hasMembers = !!(trip?.members?.length);
 // your policy: must have paid at least once AND trip has started
 const canClaim = hasPayments && tripStarted && hasMembers;
 
-const tourStepIndex = activeTripStep ? tripTourOrder.indexOf(activeTripStep) + 1 : 0;
-const tourStepLabel = activeTripStep ? `Step ${tourStepIndex} of ${tripTourOrder.length}` : '';
-const tourClass = (step) => (tripTourActive ? (activeTripStep === step ? 'tour-focus' : 'tour-dim') : '');
+  const tourStepIndex = activeTripStep ? tripTourOrder.indexOf(activeTripStep) + 1 : 0;
+  const tourStepLabel = activeTripStep ? `Step ${tourStepIndex} of ${tripTourOrder.length}` : '';
+  const tourClass = (step) => (tripTourActive ? (activeTripStep === step ? 'tour-focus' : 'tour-dim') : '');
+
+  useEffect(() => {
+    if (activeTripStep === 'addPerson') {
+      setBottomAddOpen(true);
+    }
+  }, [activeTripStep]);
+
+  useEffect(() => {
+    if (!activeTripStep) return;
+    const el = document.querySelector(`[data-tour-step="${activeTripStep}"]`);
+    if (!el) return;
+    const target = el.getBoundingClientRect().top + window.scrollY - (window.innerHeight / 2) + (el.offsetHeight / 2);
+    const start = window.scrollY;
+    const distance = target - start;
+    const duration = 700;
+    let raf = 0;
+    let startTime = 0;
+
+    const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeInOut(progress);
+      window.scrollTo(0, start + distance * eased);
+      if (progress < 1) {
+        raf = window.requestAnimationFrame(step);
+      }
+    };
+
+    raf = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(raf);
+  }, [activeTripStep]);
   
 function refreshTripClaims(nextTrip = null) {
   const sourceTrip = nextTrip || trip;
@@ -1547,7 +1589,7 @@ function onEditMember(memberId) {
       <div className="row g-4">
         <div className="col-lg-4">
           {/* Payment Summary Card */}
-          <div className={`position-relative ${tourClass('paymentSummary')}`}>
+          <div className={`position-relative ${tourClass('paymentSummary')}`} data-tour-step="paymentSummary">
             <div className="card">
               <div className="card-header bg-agf1 text-white fw-bold d-flex justify-content-between align-items-center">
                 <span>Payment summary</span>
@@ -1675,7 +1717,7 @@ function onEditMember(memberId) {
           </div>
 
           {/* Claims + Refunds */}
-          <div className={`position-relative mt-3 ${tourClass('claims')}`}>
+          <div className={`position-relative mt-3 ${tourClass('claims')}`} data-tour-step="claims">
             <div className="card">
               <div className="card-header fw-bold bg-dark text-white d-flex justify-content-between align-items-center">
                 <span>Claims</span>
@@ -1871,6 +1913,19 @@ function onEditMember(memberId) {
                 onCancel={() => setSpotAddOpen(false)}
               />
             )}
+            bottomAddOpen={bottomAddOpen}
+            onBottomAddToggle={setBottomAddOpen}
+            bottomAddForm={(
+              <TripMemberAddForm
+                tripId={trip.id}
+                compact
+                onAdded={() => {
+                  setBottomAddOpen(false);
+                  load(false);
+                }}
+                onCancel={() => setBottomAddOpen(false)}
+              />
+            )}
             rosterError={rosterError}
             renderReadyItem={(member) => (
               <MemberRow
@@ -1918,33 +1973,6 @@ function onEditMember(memberId) {
               />
             )}
           />
-
-          {trip.status !== 'ARCHIVED' && (
-            <div className="mt-2">
-              {!bottomAddOpen ? (
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
-                  style={{ borderRadius: 6, letterSpacing: '0.05em' }}
-                  onClick={() => setBottomAddOpen(true)}
-                  aria-label="Add person"
-                >
-                  <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
-                  <span>Add person</span>
-                </button>
-              ) : (
-                <TripMemberAddForm
-                  tripId={trip.id}
-                  compact
-                  onAdded={() => {
-                    setBottomAddOpen(false);
-                    load(false);
-                  }}
-                  onCancel={() => setBottomAddOpen(false)}
-                />
-              )}
-            </div>
-          )}
         </div>
 
 

@@ -12,6 +12,9 @@ export default function TripMembersList({
   spotAddOpen = false,
   onSpotAddToggle = () => {},
   spotAddForm = null,
+  bottomAddOpen = false,
+  onBottomAddToggle = () => {},
+  bottomAddForm = null,
   rosterError = null,
   searchTerm = '',
   onSearchTermChange = () => {},
@@ -56,6 +59,8 @@ export default function TripMembersList({
   const [paymentTip, setPaymentTip] = useState(false);
   const [confirmTip, setConfirmTip] = useState(false);
   const [standbyTip, setStandbyTip] = useState(false);
+  const tourClass = (step) => (tourActiveStep ? (tourActiveStep === step ? 'tour-focus' : 'tour-dim') : '');
+  const tourDim = tourActiveStep ? 'tour-dim' : '';
   const cardBaseStyle = {
     border: '1px solid #e5e7eb',
     borderRadius: 10,
@@ -179,7 +184,7 @@ export default function TripMembersList({
             </div>
           ) : (
             <>
-              <div className={`border rounded-3 p-3 ${tourActiveStep ? (tourActiveStep === 'readyRoster' ? 'tour-focus' : 'tour-dim') : ''}`}>
+              <div className={`border rounded-3 p-3 ${tourClass('readyRoster')}`} data-tour-step="readyRoster">
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <div className="fw-semibold">Ready and Covered <span className="badge bg-agf1 text-white">{coveredCount}</span></div>
@@ -237,12 +242,12 @@ export default function TripMembersList({
                 )}
               </div>
 
-              <div className="p-3 bg-light rounded-3 border">
+              <div className={`p-3 bg-light rounded-3 border ${tourDim}`}>
                 <div className="fw-semibold fs-6 text-danger mb-0">Below this point, these travelers are NOT covered.</div>
                 <div className="small text-muted">Apply credit to move them to Ready and Covered.</div>
               </div>
 
-              <div className="position-relative border rounded-3 p-3">
+              <div className={`position-relative border rounded-3 p-3 ${tourClass('pendingCoverage')}`} data-tour-step="pendingCoverage">
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <div className="fw-semibold agf2">Awaiting Payment <span className="badge bg-secondary">{awaitingPayment.length}</span></div>
@@ -290,10 +295,10 @@ export default function TripMembersList({
                 )}
               </div>
 
-              <div className="position-relative border rounded-3 p-3">
+              <div className={`position-relative border rounded-3 p-3 ${tourClass('awaitingConfirmation')}`} data-tour-step="awaitingConfirmation">
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
-                    <div className="fw-semibold text-warning">Awaiting Confirmation <span className="badge bg-dark">{awaitingConfirmation.length}</span></div>
+                    <div className="fw-semibold text-mango">Awaiting Confirmation <span className="badge bg-dark">{awaitingConfirmation.length}</span></div>
                     <div className="small text-muted">Needs confirmation or guardian approval</div>
                   </div>
                   <button
@@ -305,30 +310,40 @@ export default function TripMembersList({
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 pt-2">
-                  {confirmTip ? (
-                    <TourCallout
-                      title="Awaiting confirmation"
-                      description="These travelers still need confirmation or guardian approval. Mark them eligible and then apply credit to move them to Ready."
-                      stepLabel={tourStepLabel}
-                      onDismiss={() => setConfirmTip(false)}
-                      dismissLabel="Close"
-                      showTurnOff={false}
-                    />
-                  ) : awaitingConfirmation.length === 0 ? (
-                    <div className="text-muted">{awaitingConfirmEmpty}</div>
-                  ) : (
-                    <div className="d-flex flex-column gap-2">
-                      {awaitingConfirmation.map((member, idx) => {
-                        const key = member.member_id ?? member.id ?? idx;
-                        return wrapCard('confirm', renderPending(member), key);
-                      })}
-                    </div>
-                  )}
-                </div>
+              <div className="mt-2 pt-2">
+                {confirmTip ? (
+                  <TourCallout
+                    title="Awaiting confirmation"
+                    description="These travelers still need confirmation or guardian approval. Mark them eligible and then apply credit to move them to Ready."
+                    stepLabel={tourStepLabel}
+                    onDismiss={() => setConfirmTip(false)}
+                    dismissLabel="Close"
+                    showTurnOff={false}
+                  />
+                ) : awaitingConfirmation.length === 0 ? (
+                  <div className="text-muted">{awaitingConfirmEmpty}</div>
+                ) : (
+                  <div className="d-flex flex-column gap-2">
+                    {awaitingConfirmation.map((member, idx) => {
+                      const key = member.member_id ?? member.id ?? idx;
+                      return wrapCard('confirm', renderPending(member), key);
+                    })}
+                  </div>
+                )}
               </div>
+              {tourActiveStep === 'awaitingConfirmation' && (
+                <TourCallout
+                  className="tour-flyout"
+                  title="Awaiting confirmation"
+                  description="These travelers need confirmation or guardian approval before they can be covered."
+                  stepLabel={tourStepLabel}
+                  onDismiss={() => onTourDismiss('awaitingConfirmation')}
+                  onTurnOff={onTourTurnOff}
+                />
+              )}
+            </div>
 
-              <div className="position-relative border rounded-3 p-3">
+              <div className={`position-relative border rounded-3 p-3 ${tourClass('standbyRoster')}`} data-tour-step="standbyRoster">
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
                     <div className="fw-semibold mb-0">Standby <span className="badge text-bg-secondary">{standby.length}</span></div>
@@ -366,8 +381,47 @@ export default function TripMembersList({
                     showTurnOff={false}
                   />
                 )}
+                {tourActiveStep === 'standbyRoster' && (
+                  <TourCallout
+                    className="tour-flyout"
+                    title="Standby"
+                    description="Standby travelers are inactive and free their paid seat for someone else."
+                    stepLabel={tourStepLabel}
+                    onDismiss={() => onTourDismiss('standbyRoster')}
+                    onTurnOff={onTourTurnOff}
+                  />
+                )}
               </div>
             </>
+          )}
+
+          {bottomAddForm && (
+            <div className={`mt-3 pt-3 border-top ${tourClass('addPerson')}`} data-tour-step="addPerson">
+              {!bottomAddOpen ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
+                  style={{ borderRadius: 6, letterSpacing: '0.05em' }}
+                  onClick={() => onBottomAddToggle(true)}
+                  aria-label="Add person"
+                >
+                  <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
+                  <span>Add person</span>
+                </button>
+              ) : (
+                bottomAddForm
+              )}
+              {tourActiveStep === 'addPerson' && (
+                <TourCallout
+                  className="tour-flyout"
+                  title="Add a traveler"
+                  description="Finish the tour by adding a traveler so we can confirm and cover them."
+                  stepLabel={tourStepLabel}
+                  onDismiss={() => onTourDismiss('addPerson')}
+                  onTurnOff={onTourTurnOff}
+                />
+              )}
+            </div>
           )}
         </div>
       </div>

@@ -6,6 +6,7 @@ import { useRosterSummary } from '../data/useRosterSummary'
 import { listClaims, markClaimSeen, updateClaim, addClaimNote, addClaimMessage } from '../core/claims'
 import { daysInclusive } from '../core/pricing'
 import TripMemberAddForm from '../components/trip/TripMemberAddForm.jsx'
+import MemberEditPanel from '../components/trip/MemberEditPanel.jsx'
 import ClaimDetail from '../components/claims/ClaimDetail.jsx'
 
 function formatDate(d){
@@ -51,6 +52,8 @@ export default function AdminTrip(){
   const [pendingPage, setPendingPage] = useState(1);
   const [travelerTab, setTravelerTab] = useState('READY'); // READY | WAITING
   const [printing, setPrinting] = useState(false);
+  const [addTravelerOpen, setAddTravelerOpen] = useState(false);
+  const [editMemberId, setEditMemberId] = useState(null);
 
   const roster = useRosterSummary(id);
 
@@ -318,6 +321,56 @@ export default function AdminTrip(){
       setTimeout(()=>setMsg(''), 2000);
     }catch(e){
       setErr(e?.message || 'Unable to approve traveler.');
+      setTimeout(()=>setErr(''), 3000);
+    }finally{
+      setBusy(false);
+    }
+  }
+
+  function toEditMember(member){
+    const guardianName = member.guardianName
+      || [member.guardian_first_name, member.guardian_last_name].filter(Boolean).join(' ');
+    return {
+      id: member.id ?? member.member_id,
+      firstName: member.firstName || member.first_name || '',
+      lastName: member.lastName || member.last_name || '',
+      email: member.email || '',
+      phone: member.phone || '',
+      type: member.is_minor || member.isMinor || member.minor ? 'MINOR' : 'ADULT',
+      guardianName: guardianName || '',
+      guardianEmail: member.guardianEmail || member.guardian_email || '',
+      guardianPhone: member.guardianPhone || member.guardian_phone || ''
+    };
+  }
+
+  async function saveMemberEdit(memberId, form){
+    if (!memberId) return;
+    setBusy(true); setErr('');
+    try{
+      const nameBits = String(form.guardianName || '').trim().split(/\s+/).filter(Boolean);
+      const guardianFirst = nameBits[0] || '';
+      const guardianLast = nameBits.slice(1).join(' ');
+      await api.updateMember(memberId, {
+        first_name: form.firstName,
+        last_name: form.lastName,
+        email: form.email,
+        phone: form.phone,
+        is_minor: form.type === 'MINOR',
+        minor: form.type === 'MINOR',
+        guardianName: form.guardianName || '',
+        guardianEmail: form.guardianEmail || '',
+        guardianPhone: form.guardianPhone || '',
+        guardian_first_name: guardianFirst,
+        guardian_last_name: guardianLast,
+        guardian_email: form.guardianEmail || '',
+        guardian_phone: form.guardianPhone || ''
+      });
+      await roster.refresh();
+      setEditMemberId(null);
+      setMsg('Traveler updated.');
+      setTimeout(()=>setMsg(''), 2000);
+    }catch(e){
+      setErr(e?.message || 'Unable to update traveler.');
       setTimeout(()=>setErr(''), 3000);
     }finally{
       setBusy(false);
@@ -641,24 +694,46 @@ export default function AdminTrip(){
                     </>
                   );
                   if (travelerTab === 'READY') {
+                    const isEditing = editMemberId === m.id;
                     return (
                       <div key={m.id} className="list-group-item">
-                        {content}
-                        <div className="d-flex gap-2 align-items-center small mt-1 flex-wrap">
-                          <span className="badge text-bg-success">Paid & covered</span>
-                          {m.guardianName && <span className="badge text-bg-light">Guardian: {m.guardianName}</span>}
-                          {m.coverage_as_of && <span className="text-muted">since {formatDate(m.coverage_as_of)}</span>}
+                        <div className="d-flex justify-content-between align-items-start">
+                          <div>
+                            {content}
+                            <div className="d-flex gap-2 align-items-center small mt-1 flex-wrap">
+                              <span className="badge text-bg-success">Paid & covered</span>
+                              {m.guardianName && <span className="badge text-bg-light">Guardian: {m.guardianName}</span>}
+                              {m.coverage_as_of && <span className="text-muted">since {formatDate(m.coverage_as_of)}</span>}
+                            </div>
+                          </div>
+                          <div className="d-flex flex-column align-items-end gap-2">
+                            <button
+                              className="btn btn-sm btn-outline-secondary"
+                              onClick={() => setEditMemberId(isEditing ? null : m.id)}
+                            >
+                              {isEditing ? 'Close' : 'Edit'}
+                            </button>
+                          </div>
                         </div>
+                        {isEditing && (
+                          <div className="mt-2">
+                            <MemberEditPanel
+                              member={toEditMember(m)}
+                              onUpdate={(_, form) => saveMemberEdit(m.id, form)}
+                            />
+                          </div>
+                        )}
                       </div>
                     );
                   }
+                  const isEditing = editMemberId === m.id;
                   return (
                     <div key={m.id} className="list-group-item">
                       <div className="d-flex justify-content-between align-items-start">
                         <div>
                           {content}
                           <div className="small">
-                            {m.eligible ? <span className="badge text-bg-info">Confirmed</span> : <span className="badge text-bg-light text-dark">Needs confirmation</span>}
+                            {m.eligible ? <span className="badge text-bg-info">Confirmed</span> : <span className="badge text-bg-light text-dark">Unconfirmed</span>}
                             {m.is_minor && !m.guardianApproved && <span className="badge text-bg-warning text-dark ms-2">Guardian pending</span>}
                           </div>
                         </div>
@@ -674,8 +749,22 @@ export default function AdminTrip(){
                               Approve traveler
                             </button>
                           )}
+                          <button
+                            className="btn btn-sm btn-outline-secondary"
+                            onClick={() => setEditMemberId(isEditing ? null : m.id)}
+                          >
+                            {isEditing ? 'Close' : 'Edit'}
+                          </button>
                         </div>
                       </div>
+                      {isEditing && (
+                        <div className="mt-2">
+                          <MemberEditPanel
+                            member={toEditMember(m)}
+                            onUpdate={(_, form) => saveMemberEdit(m.id, form)}
+                          />
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -700,14 +789,27 @@ export default function AdminTrip(){
               </div>
             )}
             <div className="border-top p-3">
-              <div className="fw-semibold small mb-2">Add traveler</div>
-              <TripMemberAddForm
-                tripId={trip.id}
-                compact
-                onAdded={() => {
-                  roster.refresh();
-                }}
-              />
+              {!addTravelerOpen ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
+                  style={{ borderRadius: 6, letterSpacing: '0.05em' }}
+                  onClick={() => setAddTravelerOpen(true)}
+                >
+                  <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
+                  <span>Add traveler</span>
+                </button>
+              ) : (
+                <TripMemberAddForm
+                  tripId={trip.id}
+                  compact
+                  onAdded={() => {
+                    roster.refresh();
+                    setAddTravelerOpen(false);
+                  }}
+                  onCancel={() => setAddTravelerOpen(false)}
+                />
+              )}
             </div>
           </div>
         </div>

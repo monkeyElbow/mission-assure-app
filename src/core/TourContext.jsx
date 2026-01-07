@@ -7,9 +7,11 @@ const defaultSteps = () => ({
   dashboardIntro: true, // dashboard tip is now standalone; keep tour flow to trip pages
   paymentSummary: false,
   claims: false,
-  spotOverview: false,
   readyRoster: false,
   pendingCoverage: false,
+  awaitingConfirmation: false,
+  standbyRoster: false,
+  addPerson: false,
 });
 
 const initialState = () => ({ enabled: true, steps: defaultSteps() });
@@ -70,7 +72,16 @@ export function TourProvider({ children }) {
   const resetTour = useCallback(() => setState(initialState()), []);
 
   const value = useMemo(() => {
-    const stepOrder = ['dashboardIntro', 'paymentSummary', 'claims', 'spotOverview', 'readyRoster', 'pendingCoverage'];
+    const stepOrder = [
+      'dashboardIntro',
+      'paymentSummary',
+      'claims',
+      'readyRoster',
+      'pendingCoverage',
+      'awaitingConfirmation',
+      'standbyRoster',
+      'addPerson'
+    ];
     return {
       enabled: state.enabled,
       steps: state.steps,
