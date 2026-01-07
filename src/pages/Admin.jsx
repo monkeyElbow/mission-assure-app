@@ -54,6 +54,15 @@ export default function Admin(){
   const [drawerCoveredIds, setDrawerCoveredIds] = useState(new Set())
   const [leadersById, setLeadersById] = useState({})
   const [leaderDrawerId, setLeaderDrawerId] = useState(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportOpts, setExportOpts] = useState({
+    dateStart: '',
+    dateEnd: '',
+    status: 'ALL', // ALL | ACTIVE | ARCHIVED
+    payment: 'ALL', // ALL | PAID | UNPAID | PARTIAL | PENDING
+    claims: 'ALL', // ALL | HAS | OPEN | NONE
+    columns: 'LEADER' // BASIC | LEADER | FULL
+  })
   const [sortField, setSortField] = useState('date') // date | claims | trip | members | payment | status
   const [sortDir, setSortDir] = useState('desc') // asc | desc
   const [page, setPage] = useState(1)
@@ -377,12 +386,29 @@ useEffect(()=>{
     win.print()
   }
 
-  // CSV (simple)
-  const tripsCSV = useMemo(()=>{
-    const rows = trips.map(t=>{
+  const exportRows = useMemo(()=>{
+    const rows = filteredTrips.filter(t => {
+      if (exportOpts.dateStart && t.startDate && t.startDate < exportOpts.dateStart) return false;
+      if (exportOpts.dateEnd && t.endDate && t.endDate > exportOpts.dateEnd) return false;
+      if (exportOpts.status !== 'ALL') {
+        const status = (t.status || 'ACTIVE').toUpperCase();
+        if (exportOpts.status === 'ACTIVE' && status === 'ARCHIVED') return false;
+        if (exportOpts.status === 'ARCHIVED' && status !== 'ARCHIVED') return false;
+      }
+      if (exportOpts.payment !== 'ALL' && (t.paymentStatus || 'UNPAID') !== exportOpts.payment) return false;
+      if (exportOpts.claims !== 'ALL') {
+        const stats = claimsByTrip.get(t.id) || { total: 0, open: 0 };
+        if (exportOpts.claims === 'HAS' && stats.total === 0) return false;
+        if (exportOpts.claims === 'OPEN' && stats.open === 0) return false;
+        if (exportOpts.claims === 'NONE' && stats.total > 0) return false;
+      }
+      return true;
+    });
+
+    return rows.map(t=>{
       const days = daysInclusive(t.startDate, t.endDate)
       const leader = leadersById[t.leaderId] || {}
-      return {
+      const base = {
         tripId: t.id,
         shortId: t.shortId,
         title: t.title,
@@ -392,12 +418,27 @@ useEffect(()=>{
         days,
         ratePerDayUSD: (t.rateCents/100).toFixed(2),
         members: membersByTrip[t.id] || 0,
+        paymentStatus: t.paymentStatus,
+        status: t.status,
+        createdAt: t.createdAt
+      };
+
+      if (exportOpts.columns === 'BASIC') return base;
+
+      const leaderCore = {
         leaderId: t.leaderId || '',
         leaderName: [leader.firstName, leader.lastName].filter(Boolean).join(' ').trim(),
         leaderTitle: leader.title || '',
         leaderEmail: leader.email || '',
         leaderPhone: leader.phone || '',
-        churchName: leader.churchName || leader.legalName || '',
+        churchName: leader.churchName || leader.legalName || ''
+      };
+
+      if (exportOpts.columns === 'LEADER') return { ...base, ...leaderCore };
+
+      return {
+        ...base,
+        ...leaderCore,
         legalName: leader.legalName || '',
         ein: leader.ein || '',
         churchPhone: leader.churchPhone || '',
@@ -412,14 +453,28 @@ useEffect(()=>{
         mailingCity: leader.mailingCity || '',
         mailingState: leader.mailingState || '',
         mailingPostal: leader.mailingPostal || '',
-        mailingCountry: leader.mailingCountry || '',
-        paymentStatus: t.paymentStatus,
-        status: t.status,
-        createdAt: t.createdAt
-      }
-    })
-    return toCSV(rows)
-  }, [trips, membersByTrip, leadersById])
+        mailingCountry: leader.mailingCountry || ''
+      };
+    });
+  }, [filteredTrips, membersByTrip, leadersById, exportOpts, claimsByTrip])
+
+  const tripsCSV = useMemo(() => toCSV(exportRows), [exportRows])
+
+  function downloadTripsPdf(){
+    const rows = exportRows.map(row => (
+      `<tr>${Object.values(row).map(val => `<td>${val == null ? '' : String(val)}</td>`).join('')}</tr>`
+    )).join('');
+    const headers = exportRows.length
+      ? `<tr>${Object.keys(exportRows[0]).map(key => `<th>${key}</th>`).join('')}</tr>`
+      : '<tr><th>No data</th></tr>';
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Trips Export</title><style>body{font-family:Helvetica,Arial,sans-serif;margin:24px;}h1{font-size:20px;margin-bottom:4px;}table{width:100%;border-collapse:collapse;}th,td{border:1px solid #ccc;padding:6px 8px;font-size:12px;vertical-align:top;}th{background:#f1f3f5;text-align:left;}</style></head><body><h1>Trips Export</h1><table><thead>${headers}</thead><tbody>${rows || '<tr><td>No rows</td></tr>'}</tbody></table></body></html>`;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  }
 
   const filteredClaims = useMemo(() => {
     const term = claimSearch.trim().toLowerCase();
@@ -674,13 +729,6 @@ useEffect(()=>{
                 </button>
                 <button className={`btn btn-sm ${scope==='ALL'?'btn-secondary':'btn-outline-secondary'}`} onClick={()=>setScope('ALL')}>All ({counts.ALL})</button>
               </div>
-              <button
-                className="btn btn-outline-secondary btn-sm"
-                onClick={()=>download(`trips_${new Date().toISOString().slice(0,10)}.csv`, tripsCSV)}
-                title="Download CSV"
-              >
-                Download CSV
-              </button>
             </div>
           </div>
         </div>
@@ -1325,12 +1373,12 @@ useEffect(()=>{
       <div className="card p-3 no-hover" style={{ borderRadius: 14 }}>
         <div className="d-flex align-items-center justify-content-between">
           <h2 className="h5 mb-0">Reports</h2>
-          <button className="btn btn-outline-secondary btn-sm"
-            onClick={()=>download(`trips_${new Date().toISOString().slice(0,10)}.csv`, tripsCSV)}>
-            Download Trips CSV
-          </button>
+          <div className="btn-group btn-group-sm">
+            <button className="btn btn-primary" onClick={() => setExportOpen(true)}>
+              Export
+            </button>
+          </div>
         </div>
-        <p className="text-muted mt-2 mb-0">Exports a simple trips summary. Member-level CSV can be added next.</p>
       </div>
       {historyOpen && (
         <>
@@ -1399,6 +1447,129 @@ useEffect(()=>{
             </div>
           </div>
           <div className="modal-backdrop fade show" onClick={closeHistory}></div>
+        </>
+      )}
+
+      {exportOpen && (
+        <>
+          <div className="modal fade show" style={{ display:'block' }} role="dialog" aria-modal="true">
+            <div className="modal-dialog modal-lg modal-dialog-scrollable">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Trips CSV export</h5>
+                  <button type="button" className="btn-close" onClick={() => setExportOpen(false)}></button>
+                </div>
+                <div className="modal-body">
+                  <div className="row g-3">
+                    <div className="col-md-6">
+                      <label className="form-label small">Start date (on/after)</label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={exportOpts.dateStart}
+                        onChange={e => setExportOpts(o => ({ ...o, dateStart: e.target.value }))}
+                      />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label small">End date (on/before)</label>
+                      <input
+                        type="date"
+                        className="form-control"
+                        value={exportOpts.dateEnd}
+                        onChange={e => setExportOpts(o => ({ ...o, dateEnd: e.target.value }))}
+                      />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label small">Payment status</label>
+                      <select
+                        className="form-select"
+                        value={exportOpts.payment}
+                        onChange={e => setExportOpts(o => ({ ...o, payment: e.target.value }))}
+                      >
+                        {['ALL','PAID','UNPAID','PARTIAL','PENDING'].map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label small">Claims filter</label>
+                      <select
+                        className="form-select"
+                        value={exportOpts.claims}
+                        onChange={e => setExportOpts(o => ({ ...o, claims: e.target.value }))}
+                      >
+                        <option value="ALL">All</option>
+                        <option value="HAS">Has claims</option>
+                        <option value="OPEN">Open claims</option>
+                        <option value="NONE">No claims</option>
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label small">Status</label>
+                      <select
+                        className="form-select"
+                        value={exportOpts.status}
+                        onChange={e => setExportOpts(o => ({ ...o, status: e.target.value }))}
+                      >
+                        <option value="ALL">All</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="ARCHIVED">Inactive</option>
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label small">Columns</label>
+                      <select
+                        className="form-select"
+                        value={exportOpts.columns}
+                        onChange={e => setExportOpts(o => ({ ...o, columns: e.target.value }))}
+                      >
+                        <option value="BASIC">Basic</option>
+                        <option value="LEADER">Leader</option>
+                        <option value="FULL">Full leader details</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="d-flex align-items-center justify-content-between mt-3">
+                    <div className="text-muted small">
+                      {exportRows.length} trip{exportRows.length === 1 ? '' : 's'} in export
+                    </div>
+                    <button
+                      className="btn btn-sm btn-outline-secondary"
+                      onClick={() => setExportOpts({
+                        dateStart: '',
+                        dateEnd: '',
+                        status: 'ALL',
+                        payment: 'ALL',
+                        claims: 'ALL',
+                        columns: 'LEADER'
+                      })}
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-outline-secondary btn-sm" onClick={() => setExportOpen(false)}>Close</button>
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => download(`trips_${new Date().toISOString().slice(0,10)}.csv`, tripsCSV)}
+                    disabled={exportRows.length === 0}
+                  >
+                    Download CSV
+                  </button>
+                  <button
+                    className="btn btn-outline-primary btn-sm"
+                    onClick={downloadTripsPdf}
+                    disabled={exportRows.length === 0}
+                  >
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show" onClick={() => setExportOpen(false)}></div>
         </>
       )}
 

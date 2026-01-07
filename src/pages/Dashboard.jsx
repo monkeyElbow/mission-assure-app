@@ -269,7 +269,7 @@ const handleIntroDone = useCallback(() => setIntroDone(true), []);
               <motion.div key={t.id} 
               {...fadeSlide} 
               transition={{ ...(fadeSlide.transition || {}), delay: i * 0.18 }} 
-              className="col-md-4">
+              className="col-md-6">
 
                 <TripCard t={t} meta={metaByTrip[t.id]} />
 
