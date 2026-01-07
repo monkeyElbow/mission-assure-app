@@ -44,8 +44,8 @@ export default function TripMembersList({
   const searchResults = useMemo(
     () => [
       ...ready.map((member) => ({ member, status: 'ready' })),
-      ...awaitingPayment.map((member) => ({ member, status: 'pending' })),
-      ...awaitingConfirmation.map((member) => ({ member, status: 'pending' })),
+      ...awaitingPayment.map((member) => ({ member, status: 'payment' })),
+      ...awaitingConfirmation.map((member) => ({ member, status: 'confirm' })),
       ...standby.map((member) => ({ member, status: 'standby' }))
     ],
     [ready, awaitingPayment, awaitingConfirmation, standby]
@@ -56,6 +56,26 @@ export default function TripMembersList({
   const [paymentTip, setPaymentTip] = useState(false);
   const [confirmTip, setConfirmTip] = useState(false);
   const [standbyTip, setStandbyTip] = useState(false);
+  const cardBaseStyle = {
+    border: '1px solid #e5e7eb',
+    borderRadius: 10,
+    padding: '10px 12px'
+  };
+  const cardBorderByStatus = {
+    ready: 'var(--agf2)',
+    payment: 'var(--melon)',
+    confirm: 'var(--mango)',
+    standby: '#cbd5e1'
+  };
+  const wrapCard = (status, child, key) => (
+    <div
+      key={key}
+      className={`trip-member-card trip-member-card--${status}`}
+      style={{ ...cardBaseStyle, borderColor: cardBorderByStatus[status] || cardBaseStyle.borderColor }}
+    >
+      {child}
+    </div>
+  );
 
   return (
     <div className="d-flex flex-column gap-3">
@@ -150,9 +170,10 @@ export default function TripMembersList({
               ) : (
                 searchResults.map(({ member, status }, idx) => {
                   const key = member.member_id ?? member.id ?? idx;
-                  if (status === 'ready') return <div key={key}>{renderReady(member)}</div>;
-                  if (status === 'standby') return <div key={key}>{renderStandby(member)}</div>;
-                  return <div key={key}>{renderPending(member)}</div>;
+                  if (status === 'ready') return wrapCard('ready', renderReady(member), key);
+                  if (status === 'standby') return wrapCard('standby', renderStandby(member), key);
+                  if (status === 'confirm') return wrapCard('confirm', renderPending(member), key);
+                  return wrapCard('payment', renderPending(member), key);
                 })
               )}
             </div>
@@ -173,7 +194,7 @@ export default function TripMembersList({
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 border-top pt-2">
+                <div className="mt-2 pt-2">
                   {readyTip ? (
                     <TourCallout
                       title="Ready roster"
@@ -186,15 +207,20 @@ export default function TripMembersList({
                   ) : ready.length === 0 ? (
                     <div className="text-muted">{readyEmptyText}</div>
                   ) : (
-                    ready.map(renderReady)
+                    <div className="d-flex flex-column gap-2">
+                      {ready.map((member, idx) => {
+                        const key = member.member_id ?? member.id ?? idx;
+                        return wrapCard('ready', renderReady(member), key);
+                      })}
+                    </div>
                   )}
                   {unassignedSpots > 0 && (
-                    <div className="border rounded-3 p-2 bg-white mt-2">
+                    <div className="border rounded-3 p-3 bg-white mt-2">
                       <div className="fw-semibold small">Paid spot available</div>
                       <div className="text-muted small">
                         {unassignedSpots === 1
-                          ? 'You have 1 paid spot ready—move an eligible traveler here.'
-                          : `You have ${unassignedSpots} paid spots ready—move eligible travelers here.`}
+                          ? 'You have 1 paid spot ready—move an eligible traveler here, by adding and confirming travelers.'
+                          : `You have ${unassignedSpots} paid spots ready—move eligible travelers here, by adding and confirming travelers.`}
                       </div>
                     </div>
                   )}
@@ -231,7 +257,7 @@ export default function TripMembersList({
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 border-top pt-2">
+                <div className="mt-2 pt-2">
                   {paymentTip ? (
                     <TourCallout
                       title="Awaiting payment"
@@ -244,7 +270,12 @@ export default function TripMembersList({
                   ) : awaitingPayment.length === 0 ? (
                     <div className="text-muted">{awaitingPaymentEmpty}</div>
                   ) : (
-                    awaitingPayment.map(renderPending)
+                    <div className="d-flex flex-column gap-2">
+                      {awaitingPayment.map((member, idx) => {
+                        const key = member.member_id ?? member.id ?? idx;
+                        return wrapCard('payment', renderPending(member), key);
+                      })}
+                    </div>
                   )}
                 </div>
                 {tourActiveStep === 'pendingCoverage' && (
@@ -274,7 +305,7 @@ export default function TripMembersList({
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 border-top pt-2">
+                <div className="mt-2 pt-2">
                   {confirmTip ? (
                     <TourCallout
                       title="Awaiting confirmation"
@@ -287,7 +318,12 @@ export default function TripMembersList({
                   ) : awaitingConfirmation.length === 0 ? (
                     <div className="text-muted">{awaitingConfirmEmpty}</div>
                   ) : (
-                    awaitingConfirmation.map(renderPending)
+                    <div className="d-flex flex-column gap-2">
+                      {awaitingConfirmation.map((member, idx) => {
+                        const key = member.member_id ?? member.id ?? idx;
+                        return wrapCard('confirm', renderPending(member), key);
+                      })}
+                    </div>
                   )}
                 </div>
               </div>
@@ -307,11 +343,16 @@ export default function TripMembersList({
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 border-top pt-2">
+                <div className="mt-2 pt-2">
                   {standby.length === 0 ? (
                     <div className="text-muted">No standby travelers.</div>
                   ) : (
-                    standby.map(renderStandby)
+                    <div className="d-flex flex-column gap-2">
+                      {standby.map((member, idx) => {
+                        const key = member.member_id ?? member.id ?? idx;
+                        return wrapCard('standby', renderStandby(member), key);
+                      })}
+                    </div>
                   )}
                 </div>
                 {standbyTip && (

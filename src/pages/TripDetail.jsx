@@ -359,7 +359,7 @@ function startEdit() {
   '(Name unavailable)';
 
   return (
-    <div className="d-flex align-items-start justify-content-between py-2 border-bottom" role="listitem">
+    <div className="d-flex align-items-start justify-content-between py-2" role="listitem">
       <div className="d-flex align-items-start gap-2 flex-grow-1">
         {/* color dot */}
         <span
@@ -501,15 +501,14 @@ function startEdit() {
       </div>
 
       {/* RIGHT: actions */}
-      <div className="d-flex align-items-center gap-2 ms-2">
+      <div className="d-flex align-items-center gap-2 ms-2 align-self-center">
         {!editing ? (
           <>
-            {(status === 'pending' || status === 'standby') && (
+            {(status === 'pending' || status === 'standby') && canAllocate && (
               <button
                 className="btn btn-sm btn-primary"
-                disabled={!canAllocate}
                 onClick={onAllocate}
-                title={canAllocate ? 'Allocate coverage seat' : 'No unassigned seats or not eligible'}
+                title="Allocate coverage seat"
               >
                 Allocate
               </button>
@@ -637,6 +636,7 @@ const [coveredCount, setCoveredCount] = useState(0);
 const [pendingCount, setPendingCount] = useState(0);
   const [unassignedSpots, setUnassignedSpots] = useState(0);
   const [spotAddOpen, setSpotAddOpen] = useState(false);
+  const [bottomAddOpen, setBottomAddOpen] = useState(false);
   const balancePrevRef = useRef(null);
   const [balanceAlert, setBalanceAlert] = useState('');
   const hasAnyPayment = trip ? (listPayments(trip.id).length > 0) : false
@@ -1898,7 +1898,7 @@ function onEditMember(memberId) {
                 onRequestGuardian={handleRequestGuardian}
                 onAllocate={() => handleAllocate(member)}
                 onRelease={undefined}
-                canAllocate={isEligibleMember(member)}
+                canAllocate={isEligibleMember(member) && unassignedSpots > 0}
                 canRelease={false}
               />
             )}
@@ -1913,14 +1913,37 @@ function onEditMember(memberId) {
                 onRequestGuardian={handleRequestGuardian}
                 onAllocate={() => handleAllocate(member)}
                 onRelease={undefined}
-                canAllocate={standbyAllocatable(member)}
+                canAllocate={standbyAllocatable(member) && unassignedSpots > 0}
                 canRelease={false}
               />
             )}
           />
 
           {trip.status !== 'ARCHIVED' && (
-            <TripMemberAddForm tripId={trip.id} onAdded={() => load(false)} />
+            <div className="mt-2">
+              {!bottomAddOpen ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2 text-uppercase fw-semibold"
+                  style={{ borderRadius: 6, letterSpacing: '0.05em' }}
+                  onClick={() => setBottomAddOpen(true)}
+                  aria-label="Add person"
+                >
+                  <i className="bi bi-plus-circle-fill" aria-hidden="true"></i>
+                  <span>Add person</span>
+                </button>
+              ) : (
+                <TripMemberAddForm
+                  tripId={trip.id}
+                  compact
+                  onAdded={() => {
+                    setBottomAddOpen(false);
+                    load(false);
+                  }}
+                  onCancel={() => setBottomAddOpen(false)}
+                />
+              )}
+            </div>
           )}
         </div>
 

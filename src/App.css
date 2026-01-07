@@ -165,6 +165,28 @@ button.btn-link {
   text-decoration: none !important;
 }
 
+.trip-member-card {
+  background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(148, 163, 184, 0.04) 100%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+  transition: transform 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+.trip-member-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+.trip-member-card--ready {
+  background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(0,138,171,0.05) 100%);
+}
+.trip-member-card--payment {
+  background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(242,102,96,0.06) 100%);
+}
+.trip-member-card--confirm {
+  background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(255,164,0,0.07) 100%);
+}
+.trip-member-card--standby {
+  background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(148,163,184,0.08) 100%);
+}
+
 /* Claims buttons in Admin trips list */
 .claims-count-btn.btn-outline-danger,
 .claims-count-btn.btn-outline-secondary {
