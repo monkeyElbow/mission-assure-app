@@ -615,6 +615,7 @@ function closeEdit() {
 const [spotPrice, setSpotPrice] = useState(0);
 
   const [trip, setTrip] = useState(null)        // unified trip object with .members
+  const [leader, setLeader] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editingTrip, setEditingTrip] = useState(false)
   const [savingTrip, setSavingTrip] = useState(false)
@@ -782,6 +783,8 @@ async function load(showSpinner = true){
     let merged = res && res.trip ? { ...res.trip, members: res.members || [] } : res
     if (merged && !Array.isArray(merged.members)) merged.members = []
     setTrip(merged)
+    const leaderData = merged?.leaderId ? await api.getLeader(merged.leaderId) : null
+    setLeader(leaderData)
     setSpotAddOpen(false)
     await loadRoster(merged)
     refreshTripClaims(merged)
@@ -1595,7 +1598,7 @@ function onEditMember(memberId) {
                           type="button"
                           className="btn btn-outline-secondary w-100"
                           onClick={() => {
-                            const snap = buildReceiptSnapshot(trip);
+                            const snap = buildReceiptSnapshot(trip, { leader });
                             openReceiptPrintWindow(snap);
                           }}
                         >

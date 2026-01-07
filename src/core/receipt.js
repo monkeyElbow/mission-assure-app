@@ -27,7 +27,7 @@ const escapeHtml = (s = '') =>
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#039;')
 
-export function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null } = {}) {
+export function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null, leader: leaderOverride = null } = {}) {
   const members = Array.isArray(trip?.members) ? trip.members : []
   const cov = coverageSummary(trip, members)
 
@@ -53,6 +53,16 @@ export function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null 
   const balanceDue = Math.max(0, subtotalCents - creditsCents)
   const refundEligibleCents = Math.max(0, creditsCents - subtotalCents)
 
+  const leader = leaderOverride || trip?.leader || null
+  const leaderNameParts = [leader?.firstName, leader?.lastName].filter(Boolean).join(' ').trim()
+  const leaderName = leaderNameParts || leader?.name || leader?.email || ''
+  const leaderAddressParts = [
+    leader?.churchAddress1,
+    leader?.churchAddress2,
+    [leader?.churchCity, leader?.churchState, leader?.churchPostal].filter(Boolean).join(', '),
+    leader?.churchCountry
+  ].filter(Boolean)
+
   return {
     tripId: trip?.shortId || trip?.id,
     title: trip?.title || 'Mission Assure Trip',
@@ -70,7 +80,12 @@ export function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null 
     paymentCents,
     totalPaidToDateCents: creditsCents,
     generatedAt: new Date(),
-    paidAt: paidAt || null
+    paidAt: paidAt || null,
+    leaderName,
+    leaderEmail: leader?.email || '',
+    leaderPhone: leader?.phone || '',
+    leaderChurchName: leader?.churchName || leader?.legalName || '',
+    leaderChurchAddress: leaderAddressParts.join(' · ')
   }
 }
 
@@ -126,7 +141,10 @@ export function renderReceiptHTML(snap) {
       <div>${escapeHtml(snap.region)} trip</div>
       <div>${period}</div>
       ${snap.leaderName ? `<div>Leader: ${escapeHtml(snap.leaderName)}</div>` : ""}
+      ${snap.leaderChurchName ? `<div>${escapeHtml(snap.leaderChurchName)}</div>` : ""}
+      ${snap.leaderChurchAddress ? `<div>${escapeHtml(snap.leaderChurchAddress)}</div>` : ""}
       ${snap.leaderEmail ? `<div>${escapeHtml(snap.leaderEmail)}</div>` : ""}
+      ${snap.leaderPhone ? `<div>${escapeHtml(snap.leaderPhone)}</div>` : ""}
     </div>
   </div>
 

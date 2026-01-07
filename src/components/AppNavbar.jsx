@@ -33,6 +33,7 @@ export default function AppNavbar(){
           <ul className="navbar-nav ms-auto">
             <li className="nav-item"><NavLink className="nav-link" to="/">Dashboard</NavLink></li>
             <li className="nav-item"><NavLink className="nav-link" to="/trips/new">New Trip</NavLink></li>
+            <li className="nav-item"><NavLink className="nav-link" to="/account">Account</NavLink></li>
             <li className="nav-item"><NavLink className="nav-link" to="/faq">FAQ</NavLink></li>
             <li className="nav-item"><NavLink className="nav-link demo-admin" to="/admin">Admin</NavLink></li>
             <li className="nav-item"><NavLink className="nav-link demo-admin" to="/claims">Claims</NavLink></li>

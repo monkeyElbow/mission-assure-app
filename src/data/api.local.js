@@ -503,6 +503,70 @@ function truthy(v) {
 
 const T_TRIPS = 'trips';
 const T_MEMBERS = 'members';
+const T_LEADERS = 'leaders';
+
+const CURRENT_LEADER_KEY = 'missionassure.currentLeaderId';
+let currentLeaderIdMemory = null;
+
+function getCurrentLeaderId() {
+  if (typeof localStorage === 'undefined') return currentLeaderIdMemory;
+  try {
+    return localStorage.getItem(CURRENT_LEADER_KEY) || currentLeaderIdMemory;
+  } catch {
+    return currentLeaderIdMemory;
+  }
+}
+
+function setCurrentLeaderId(id) {
+  currentLeaderIdMemory = id;
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(CURRENT_LEADER_KEY, id);
+  } catch {}
+}
+
+function seedLeaderIfEmpty() {
+  const existing = store.all(T_LEADERS);
+  if (existing.length === 0) {
+    const leader = store.insert(T_LEADERS, {
+      firstName: 'John',
+      lastName: 'Demo',
+      title: 'Pastor',
+      email: 'john.demo@gracechapel.org',
+      phone: '615-555-0110',
+      churchName: 'Grace Chapel',
+      legalName: 'Grace Chapel Church',
+      ein: '12-3456789',
+      churchPhone: '615-555-0100',
+      churchAddress1: '123 Hope St',
+      churchAddress2: 'Suite 200',
+      churchCity: 'Nashville',
+      churchState: 'TN',
+      churchPostal: '37201',
+      churchCountry: 'USA',
+      mailingAddress1: '123 Hope St',
+      mailingAddress2: 'Suite 200',
+      mailingCity: 'Nashville',
+      mailingState: 'TN',
+      mailingPostal: '37201',
+      mailingCountry: 'USA',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    setCurrentLeaderId(leader.id);
+  } else if (!getCurrentLeaderId()) {
+    setCurrentLeaderId(existing[0].id);
+  }
+
+  const leaderId = getCurrentLeaderId();
+  if (!leaderId) return;
+  const trips = store.all(T_TRIPS);
+  trips.forEach(t => {
+    if (!t.leaderId) {
+      store.put(T_TRIPS, { ...t, leaderId, updatedAt: new Date().toISOString() });
+    }
+  });
+}
 
 // Hook claim module into trip history so all claim activity is logged
 setClaimHistoryLogger((evt = {}) => {
@@ -929,7 +993,40 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     return { trip, members };
   },
 
+  async listLeaders(){
+    return store.all(T_LEADERS).sort((a,b)=>+new Date(b.createdAt || 0) - +new Date(a.createdAt || 0));
+  },
+
+  async getLeader(id){
+    return store.byId(T_LEADERS, id);
+  },
+
+  async getCurrentLeader(){
+    const leaderId = getCurrentLeaderId();
+    if (!leaderId) return null;
+    return store.byId(T_LEADERS, leaderId);
+  },
+
+  async setCurrentLeader(id){
+    if (!id) return null;
+    const leader = store.byId(T_LEADERS, id);
+    if (!leader) return null;
+    setCurrentLeaderId(id);
+    return leader;
+  },
+
+  async updateLeader(id, patch){
+    const leaders = store.all(T_LEADERS);
+    const i = leaders.findIndex(l => l.id === id);
+    if (i < 0) throw new Error('Leader not found');
+    const current = leaders[i];
+    const next = { ...current, ...patch, updatedAt: new Date().toISOString() };
+    store.put(T_LEADERS, next);
+    return next;
+  },
+
   async createTrip(input){ // {title,startDate,endDate,region}
+    seedLeaderIfEmpty();
     seedRatesIfEmpty();
     const { startDate, endDate } = input || {};
     if (startDate && endDate && startDate >= endDate) {
@@ -938,14 +1035,17 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     const rate = selectRate(input.region, input.startDate);
     if (!rate) throw new Error('No applicable rate for that start date.');
     const now = new Date().toISOString();
+    const leaderId = input?.leaderId || getCurrentLeaderId();
     const trip = store.insert(T_TRIPS, {
-        shortId: nextTripShortId(),        // NEW
-        ...input,
-        rateCents: rate.amountCents,
-        paymentStatus: 'UNPAID',           // NEW: UNPAID | PAID
-        status: 'ACTIVE',
-        createdAt: now, updatedAt: now
-      });
+      shortId: nextTripShortId(),        // NEW
+      ...input,
+      leaderId,
+      rateCents: rate.amountCents,
+      paymentStatus: 'UNPAID',           // NEW: UNPAID | PAID
+      status: 'ACTIVE',
+      createdAt: now,
+      updatedAt: now
+    });
     appendEvent({
       trip,
       type: 'TRIP_CREATED',
@@ -1316,6 +1416,8 @@ export async function seedCoverageIfNeeded(){
 export async function initLocalApi() {
   // If you have an existing demo seed, keep it:
   // seedDemoIfEmpty && typeof seedDemoIfEmpty === 'function' && seedDemoIfEmpty();
+
+  seedLeaderIfEmpty();
 
   // Create coverage spots from current credits & members (no-op if already seeded)
   await seedCoverageIfNeeded();

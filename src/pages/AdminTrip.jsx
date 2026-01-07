@@ -29,6 +29,7 @@ export default function AdminTrip(){
   const navigate = useNavigate();
 
   const [trip, setTrip] = useState(null);
+  const [leader, setLeader] = useState(null);
   const [claims, setClaims] = useState([]);
   const [claimDetailId, setClaimDetailId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -90,6 +91,8 @@ export default function AdminTrip(){
       const res = await api.getTrip(id);
       setTrip(res.trip);
       setClaims(listClaims());
+      const leaderData = res.trip?.leaderId ? await api.getLeader(res.trip.leaderId) : null;
+      setLeader(leaderData);
     } catch (e) {
       setErr(e?.message || 'Unable to load trip.');
     } finally {
@@ -461,6 +464,13 @@ export default function AdminTrip(){
   const pendingCount = roster.pendingCount || 0;
   const readyPct = coveredCount + pendingCount === 0 ? 0 : Math.round((coveredCount / (coveredCount + pendingCount)) * 100);
   const openClaims = tripClaims.filter(c => ['SUBMITTED','IN_REVIEW','MORE_INFO'].includes(c.status));
+  const leaderName = leader ? [leader.firstName, leader.lastName].filter(Boolean).join(' ').trim() || leader.email : '';
+  const leaderAddressLines = leader ? [
+    leader.churchAddress1,
+    leader.churchAddress2,
+    [leader.churchCity, leader.churchState, leader.churchPostal].filter(Boolean).join(', '),
+    leader.churchCountry
+  ].filter(Boolean) : [];
 
   return (
     <div className="container my-3" style={{ maxWidth: 1200 }}>
@@ -496,6 +506,25 @@ export default function AdminTrip(){
 
       {err && <InlineNotice tone="danger" dismissible className="mb-2">{err}</InlineNotice>}
       {msg && <InlineNotice tone="success" dismissible className="mb-2">{msg}</InlineNotice>}
+
+      {leader && (
+        <div className="card mb-3">
+          <div className="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div className="fw-semibold">Leader account</div>
+            <Link className="btn btn-sm btn-outline-secondary" to="/account">Open account</Link>
+          </div>
+          <div className="card-body small">
+            <div className="fw-semibold">{leaderName || 'Leader'}</div>
+            <div className="text-muted">{leader.title || '—'}</div>
+            <div>{leader.email || '—'} {leader.phone ? `· ${leader.phone}` : ''}</div>
+            <div className="mt-2 fw-semibold">{leader.churchName || leader.legalName || '—'}</div>
+            <div className="text-muted">{leader.legalName ? `Legal: ${leader.legalName}` : '—'}</div>
+            <div>{leader.churchPhone || '—'}</div>
+            <div>{leaderAddressLines.length ? leaderAddressLines.join(' · ') : '—'}</div>
+            <div className="text-muted">EIN: {leader.ein || '—'}</div>
+          </div>
+        </div>
+      )}
 
       <div className="row g-3 mb-3">
         <div className="col-md-4">

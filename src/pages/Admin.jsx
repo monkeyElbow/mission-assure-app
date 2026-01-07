@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fadeSlide } from '../ui/motion'
 import InlineNotice from '../components/InlineNotice.jsx'
 import { listClaims, updateClaim, addClaimNote, addClaimMessage, markClaimSeen } from '../core/claims'
+import AdminLeaderDrawer from '../components/admin/AdminLeaderDrawer.jsx'
 
 const motionRef = motion; void motionRef; // satisfy lint without react JSX plugin
 
@@ -51,6 +52,8 @@ export default function Admin(){
   const [membersLoading, setMembersLoading] = useState(false)
   const [membersIndex, setMembersIndex] = useState({}) // tripId -> minimal member info for search
   const [drawerCoveredIds, setDrawerCoveredIds] = useState(new Set())
+  const [leadersById, setLeadersById] = useState({})
+  const [leaderDrawerId, setLeaderDrawerId] = useState(null)
   const [sortField, setSortField] = useState('date') // date | claims | trip | members | payment | status
   const [sortDir, setSortDir] = useState('desc') // asc | desc
   const [page, setPage] = useState(1)
@@ -116,6 +119,15 @@ const formatUsd = (cents = 0) => `$${(Number(cents || 0) / 100).toFixed(2)}`
       setMembersIndex(memberMap)
     })()
   },[])
+
+  useEffect(() => {
+    (async () => {
+      const leaders = await api.listLeaders();
+      const map = {};
+      leaders.forEach(l => { map[l.id] = l; });
+      setLeadersById(map);
+    })();
+  }, []);
 
   // rates init
 useEffect(()=>{
@@ -188,7 +200,12 @@ useEffect(()=>{
           const hay = `${m.name} ${m.email} ${m.phone}`.toLowerCase()
           return hay.includes(s)
         })
-        return titleMatch || memberMatch
+        const leader = leadersById[t.leaderId];
+        const leaderHay = leader
+          ? `${leader.firstName || ''} ${leader.lastName || ''} ${leader.email || ''} ${leader.churchName || ''}`.toLowerCase()
+          : '';
+        const leaderMatch = leaderHay.includes(s);
+        return titleMatch || memberMatch || leaderMatch
       })
     }
 
@@ -239,7 +256,7 @@ useEffect(()=>{
     })
 
     return sorted
-  }, [trips, scope, q, claimsOnlyTrips, claimsByTrip, sortField, sortDir, membersByTrip, membersIndex])
+  }, [trips, scope, q, claimsOnlyTrips, claimsByTrip, sortField, sortDir, membersByTrip, membersIndex, leadersById])
 
   const pagination = useMemo(() => {
     const totalPages = Math.max(1, Math.ceil(filteredTrips.length / pageSize));
@@ -364,6 +381,7 @@ useEffect(()=>{
   const tripsCSV = useMemo(()=>{
     const rows = trips.map(t=>{
       const days = daysInclusive(t.startDate, t.endDate)
+      const leader = leadersById[t.leaderId] || {}
       return {
         tripId: t.id,
         shortId: t.shortId,
@@ -374,13 +392,34 @@ useEffect(()=>{
         days,
         ratePerDayUSD: (t.rateCents/100).toFixed(2),
         members: membersByTrip[t.id] || 0,
+        leaderId: t.leaderId || '',
+        leaderName: [leader.firstName, leader.lastName].filter(Boolean).join(' ').trim(),
+        leaderTitle: leader.title || '',
+        leaderEmail: leader.email || '',
+        leaderPhone: leader.phone || '',
+        churchName: leader.churchName || leader.legalName || '',
+        legalName: leader.legalName || '',
+        ein: leader.ein || '',
+        churchPhone: leader.churchPhone || '',
+        churchAddress1: leader.churchAddress1 || '',
+        churchAddress2: leader.churchAddress2 || '',
+        churchCity: leader.churchCity || '',
+        churchState: leader.churchState || '',
+        churchPostal: leader.churchPostal || '',
+        churchCountry: leader.churchCountry || '',
+        mailingAddress1: leader.mailingAddress1 || '',
+        mailingAddress2: leader.mailingAddress2 || '',
+        mailingCity: leader.mailingCity || '',
+        mailingState: leader.mailingState || '',
+        mailingPostal: leader.mailingPostal || '',
+        mailingCountry: leader.mailingCountry || '',
         paymentStatus: t.paymentStatus,
         status: t.status,
         createdAt: t.createdAt
       }
     })
     return toCSV(rows)
-  }, [trips, membersByTrip])
+  }, [trips, membersByTrip, leadersById])
 
   const filteredClaims = useMemo(() => {
     const term = claimSearch.trim().toLowerCase();
@@ -655,6 +694,7 @@ useEffect(()=>{
                     Trip {sortArrow('trip')}
                   </button>
                 </th>
+                <th>Leader</th>
                 <th>
                   <button className="btn btn-link btn-sm p-0 text-decoration-none text-dark" onClick={()=>toggleSort('members')}>
                     Members {sortArrow('members')}
@@ -722,6 +762,25 @@ useEffect(()=>{
                           <span className="badge text-bg-light small">{t.region}</span>
                           <span>{t.startDate} → {t.endDate} ({days} days)</span>
                         </div>
+                      </td>
+                      <td className="align-middle">
+                        {(() => {
+                          const leader = leadersById[t.leaderId];
+                          if (!leader) return <span className="text-muted">—</span>;
+                          const leaderName = [leader.firstName, leader.lastName].filter(Boolean).join(' ').trim() || leader.email || 'Leader';
+                          return (
+                            <div className="d-flex flex-column">
+                              <button
+                                type="button"
+                                className="btn btn-link btn-sm p-0 text-decoration-none text-start"
+                                onClick={() => setLeaderDrawerId(leader.id)}
+                              >
+                                {leaderName}
+                              </button>
+                              <span className="text-muted small">{leader.churchName || leader.legalName || '—'}</span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="text-center align-middle">
                         <button
@@ -950,7 +1009,7 @@ useEffect(()=>{
               })}
               
               {filteredTrips.length===0 && (
-                <tr><td colSpan="7" className="text-center text-muted py-4">No trips</td></tr>
+                <tr><td colSpan="8" className="text-center text-muted py-4">No trips</td></tr>
               )}
               </AnimatePresence>
             </tbody>
@@ -1342,6 +1401,12 @@ useEffect(()=>{
           <div className="modal-backdrop fade show" onClick={closeHistory}></div>
         </>
       )}
+
+      <AdminLeaderDrawer
+        leader={leadersById[leaderDrawerId]}
+        open={!!leaderDrawerId}
+        onClose={() => setLeaderDrawerId(null)}
+      />
     </div>
   )
 }

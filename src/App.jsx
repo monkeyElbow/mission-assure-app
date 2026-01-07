@@ -10,6 +10,7 @@ import AdminTrip from './pages/AdminTrip.jsx'
 import NotFound from './pages/NotFound.jsx'
 import FAQ from './pages/FAQ.jsx'
 import DevPlaybook from './pages/DevPlaybook.jsx'
+import Account from './pages/Account.jsx'
 import Footer from './components/Footer.jsx'
 
 function Layout(){
@@ -32,6 +33,7 @@ export default function App(){
         <Route path="trips/new" element={<TripNew />} />
         <Route path="trips/:id" element={<TripDetail />} />
         <Route path="claims" element={<Claims />} />
+        <Route path="account" element={<Account />} />
         <Route path="faq" element={<FAQ />} />
         <Route path="admin" element={<Admin />} />
         <Route path="admin/trips/:id" element={<AdminTrip />} />

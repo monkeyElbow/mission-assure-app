@@ -2,6 +2,15 @@ import React from 'react'
 
 export default function AdminLeaderDrawer({ leader, open, onClose }){
   if(!open) return null
+  const name = [leader?.firstName, leader?.lastName].filter(Boolean).join(' ').trim() || leader?.name || '—';
+  const churchLines = [
+    leader?.churchAddress1,
+    leader?.churchAddress2
+  ].filter(Boolean);
+  const cityState = [leader?.churchCity, leader?.churchState, leader?.churchPostal].filter(Boolean).join(', ');
+  const country = leader?.churchCountry;
+  if (cityState) churchLines.push(cityState);
+  if (country) churchLines.push(country);
   return (
     <div className="ma-modal-backdrop" onClick={onClose}>
       <div className="ma-modal" onClick={e=>e.stopPropagation()}>
@@ -10,11 +19,16 @@ export default function AdminLeaderDrawer({ leader, open, onClose }){
           <button className="btn btn-sm btn-outline-secondary" onClick={onClose}>×</button>
         </div>
         <div className="ma-modal-body">
-          <div><strong>{leader?.name||'—'}</strong></div>
-          <div className="text-muted small">{leader?.org||'—'}</div>
-          <div className="small">{leader?.email||'—'}</div>
-          <div className="small">{leader?.phone||'—'}</div>
-          <div className="small">{leader?.address||'—'}</div>
+          <div><strong>{name}</strong></div>
+          <div className="text-muted small">{leader?.title || '—'}</div>
+          <div className="small">{leader?.email || '—'}</div>
+          <div className="small">{leader?.phone || '—'}</div>
+          <hr className="my-2" />
+          <div className="fw-semibold">{leader?.churchName || '—'}</div>
+          <div className="text-muted small">{leader?.legalName || '—'}</div>
+          <div className="small">{leader?.churchPhone || leader?.phone || '—'}</div>
+          <div className="small">{churchLines.length ? churchLines.join(' · ') : '—'}</div>
+          <div className="small text-muted">EIN: {leader?.ein || '—'}</div>
         </div>
       </div>
       <style>{`
