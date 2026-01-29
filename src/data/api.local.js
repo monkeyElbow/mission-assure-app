@@ -131,7 +131,12 @@ function memberFlags(member = {}) {
     truthy(guardian.approved);
   const active =
     member.active === undefined ? true : truthy(member.active);
-  return { isMinor, confirmed, guardianApproved, active };
+  const tripLeader =
+    truthy(member.tripLeader) ||
+    truthy(member.trip_leader) ||
+    truthy(member.is_trip_leader) ||
+    truthy(member.isTripLeader);
+  return { isMinor, confirmed, guardianApproved, active, tripLeader };
 }
 
 function extractGuardian(member = {}) {
@@ -183,6 +188,7 @@ function memberSnapshot(tripId, member, { includeGuardian = false } = {}) {
   details.push(`Active: ${flags.active ? 'Yes' : 'No'}`);
   details.push(`Confirmed: ${flags.confirmed ? 'Yes' : 'No'}`);
   details.push(`Minor: ${flags.isMinor ? 'Yes' : 'No'}`);
+  details.push(`Trip Leader: ${flags.tripLeader ? 'Yes' : 'No'}`);
   if (flags.isMinor) {
     details.push(`Guardian OK: ${flags.guardianApproved ? 'Yes' : 'No'}`);
   }
@@ -211,6 +217,7 @@ function canonicalMemberView(member = {}) {
     confirmed: flags.confirmed ? 'Yes' : 'No',
     minor: flags.isMinor ? 'Yes' : 'No',
     guardianApproved: flags.guardianApproved ? 'Yes' : 'No',
+    tripLeader: flags.tripLeader ? 'Yes' : 'No',
     guardianName: [guardian.first, guardian.last].filter(Boolean).join(' ') || 'N/A',
     guardianEmail: guardian.email || 'N/A',
     guardianPhone: guardian.phone || 'N/A'
@@ -450,6 +457,8 @@ function truthy(v) {
         approved: guardianApproved,
         approved_at: guardian.approved_at ?? guardian.approvedAt ?? null
       },
+      tripLeader: truthy(m.tripLeader) || truthy(m.trip_leader) || truthy(m.is_trip_leader) || truthy(m.isTripLeader),
+      trip_leader: truthy(m.tripLeader) || truthy(m.trip_leader) || truthy(m.is_trip_leader) || truthy(m.isTripLeader),
       active,
       eligible,
       covered,
@@ -1114,6 +1123,23 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
   async addMembers(tripId, arr){ // [{firstName,lastName,email}]
     const trip = store.byId(T_TRIPS, tripId);
     if (!trip) throw new Error('Trip not found');
+    const wantsLeader = (arr || []).some(m =>
+      truthy(m.tripLeader) || truthy(m.trip_leader) || truthy(m.is_trip_leader) || truthy(m.isTripLeader)
+    );
+    if (wantsLeader) {
+      const peers = store.all(T_MEMBERS).filter(x => x.tripId === tripId);
+      for (const peer of peers) {
+        const peerLeader = truthy(peer.tripLeader) || truthy(peer.trip_leader) || truthy(peer.is_trip_leader) || truthy(peer.isTripLeader);
+        if (!peerLeader) continue;
+        store.put(T_MEMBERS, {
+          ...peer,
+          tripLeader: false,
+          trip_leader: false,
+          is_trip_leader: false,
+          isTripLeader: false
+        });
+      }
+    }
     const inserted = arr.map(data =>
       store.insert(T_MEMBERS, { tripId, status: 'IN_PROGRESS', ...data })
     );
@@ -1133,6 +1159,26 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
     if (!m) throw new Error('Member not found');
     const beforeView = canonicalMemberView(m);
     const next = { ...m, ...patch };
+    const leaderPatch =
+      Object.prototype.hasOwnProperty.call(patch, 'tripLeader') ||
+      Object.prototype.hasOwnProperty.call(patch, 'trip_leader') ||
+      Object.prototype.hasOwnProperty.call(patch, 'is_trip_leader') ||
+      Object.prototype.hasOwnProperty.call(patch, 'isTripLeader');
+    const leaderOn = truthy(next.tripLeader) || truthy(next.trip_leader) || truthy(next.is_trip_leader) || truthy(next.isTripLeader);
+    if (leaderPatch && leaderOn) {
+      const peers = store.all(T_MEMBERS).filter(x => x.tripId === next.tripId && x.id !== next.id);
+      for (const peer of peers) {
+        const peerLeader = truthy(peer.tripLeader) || truthy(peer.trip_leader) || truthy(peer.is_trip_leader) || truthy(peer.isTripLeader);
+        if (!peerLeader) continue;
+        store.put(T_MEMBERS, {
+          ...peer,
+          tripLeader: false,
+          trip_leader: false,
+          is_trip_leader: false,
+          isTripLeader: false
+        });
+      }
+    }
     store.put(T_MEMBERS, next);
     rebalanceCoverage(next.tripId);
     const trip = store.byId(T_TRIPS, next.tripId);
@@ -1148,6 +1194,7 @@ async getTripHistory(tripId, { start=null, end=null, type=null, member_id=null, 
         confirmed: 'Confirmed',
         minor: 'Minor',
         guardianApproved: 'Guardian Approved',
+        tripLeader: 'Trip Leader',
         guardianName: 'Guardian Name',
         guardianEmail: 'Guardian Email',
         guardianPhone: 'Guardian Phone'

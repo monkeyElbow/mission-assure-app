@@ -265,8 +265,11 @@ export default function Claims(){
                 <h2 className="h5 mb-0">{activeClaim.claimNumber}</h2>
                 {activeClaim.freshForLeader && <span className="badge bg-danger">New</span>}
               </div>
-              <div className="text-muted">
-                {activeClaim.tripTitle || activeClaim.tripId} • {activeClaim.memberName}
+              <div className="text-muted d-flex align-items-center gap-1 flex-wrap">
+                <span>{activeClaim.tripTitle || activeClaim.tripId} • {activeClaim.memberName}</span>
+                {activeClaim.memberTripLeader && (
+                  <span className="trip-leader-mark" title="Trip leader" aria-label="Trip leader">★</span>
+                )}
               </div>
             </div>
             <button className="btn btn-outline-secondary btn-sm" onClick={()=>setActiveClaim(null)}>
@@ -363,7 +366,12 @@ export default function Claims(){
                     </td>
                     <td><span className="fw-semibold">{c.tripTitle || c.tripId}</span></td>
                     <td>
-                      <div className="fw-medium">{c.memberName}</div>
+                      <div className="fw-medium d-flex align-items-center gap-1">
+                        <span>{c.memberName}</span>
+                        {c.memberTripLeader && (
+                          <span className="trip-leader-mark" title="Trip leader" aria-label="Trip leader">★</span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <div className="small">{c.incidentType} — {c.incidentDate}</div>

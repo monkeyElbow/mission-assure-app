@@ -62,6 +62,12 @@ export function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null,
     [leader?.churchCity, leader?.churchState, leader?.churchPostal].filter(Boolean).join(', '),
     leader?.churchCountry
   ].filter(Boolean)
+  const tripLeaderMember = members.find(m =>
+    m?.tripLeader || m?.trip_leader || m?.is_trip_leader || m?.isTripLeader
+  );
+  const tripLeaderName = tripLeaderMember ? formatMemberName(tripLeaderMember) : '';
+  const tripLeaderEmail = tripLeaderMember?.email || tripLeaderMember?.emailAddress || '';
+  const tripLeaderPhone = tripLeaderMember?.phone || tripLeaderMember?.phoneNumber || '';
 
   return {
     tripId: trip?.shortId || trip?.id,
@@ -85,7 +91,10 @@ export function buildReceiptSnapshot(trip, { paymentCents = null, paidAt = null,
     leaderEmail: leader?.email || '',
     leaderPhone: leader?.phone || '',
     leaderChurchName: leader?.churchName || leader?.legalName || '',
-    leaderChurchAddress: leaderAddressParts.join(' · ')
+    leaderChurchAddress: leaderAddressParts.join(' · '),
+    tripLeaderName,
+    tripLeaderEmail,
+    tripLeaderPhone
   }
 }
 
@@ -136,11 +145,14 @@ export function renderReceiptHTML(snap) {
       <h1 class="h1">Payment Receipt</h1>
       <div class="muted">Trip <span class="mono">#${escapeHtml(String(snap.tripId || ""))}</span></div>
     </div>
-    <div class="right small">
+      <div class="right small">
       <div><strong>${escapeHtml(snap.title)}</strong></div>
       <div>${escapeHtml(snap.region)} trip</div>
       <div>${period}</div>
       ${snap.leaderName ? `<div>Leader: ${escapeHtml(snap.leaderName)}</div>` : ""}
+      ${snap.tripLeaderName ? `<div>Trip leader: ${escapeHtml(snap.tripLeaderName)}</div>` : ""}
+      ${snap.tripLeaderEmail ? `<div>${escapeHtml(snap.tripLeaderEmail)}</div>` : ""}
+      ${snap.tripLeaderPhone ? `<div>${escapeHtml(snap.tripLeaderPhone)}</div>` : ""}
       ${snap.leaderChurchName ? `<div>${escapeHtml(snap.leaderChurchName)}</div>` : ""}
       ${snap.leaderChurchAddress ? `<div>${escapeHtml(snap.leaderChurchAddress)}</div>` : ""}
       ${snap.leaderEmail ? `<div>${escapeHtml(snap.leaderEmail)}</div>` : ""}

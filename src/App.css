@@ -173,6 +173,8 @@ button.btn-link {
 .trip-member-card:hover {
   transform: scale(1.05);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 2;
 }
 .trip-member-card--ready {
   background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(0,138,171,0.05) 100%);
@@ -185,6 +187,89 @@ button.btn-link {
 }
 .trip-member-card--standby {
   background: linear-gradient(142deg, rgba(255,255,255,1) 60%, rgba(148,163,184,0.08) 100%);
+}
+
+.trip-roster-section {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  overflow: visible;
+  background: #fff;
+}
+.trip-roster-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  color: #fff;
+  font-weight: 700;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+.trip-roster-header--ready {
+  background: var(--agf2);
+}
+.trip-roster-header--payment {
+  background: var(--agf1);
+}
+.trip-roster-header--confirm {
+  background: #d99000;
+}
+.trip-roster-header--standby {
+  background: #6c757d;
+}
+.trip-roster-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.trip-roster-count {
+  font-weight: 800;
+}
+.trip-roster-header-btn {
+  color: #fff !important;
+  text-decoration: none !important;
+  padding: 0 !important;
+}
+.trip-roster-header-btn i {
+  color: #fff;
+}
+
+.trip-leader-mark {
+  color: var(--mango);
+  font-size: 0.85em;
+  line-height: 1;
+}
+.trip-roster-body {
+  padding: 12px;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.trip-roster-divider {
+  background: var(--dark);
+  color: #fff;
+  padding: 12px 16px;
+  margin-left: -16px;
+  margin-right: -16px;
+  border-radius: 0;
+}
+
+.trip-detail-page {
+  background: transparent;
+}
+
+body.trip-detail-bg {
+  background-image:
+    linear-gradient(325deg, rgba(255,255,255,0.998) 0%, rgba(255,255,255,0.96) 62%, rgba(0,138,171,0.045) 100%),
+    url("./assets/card-map.svg");
+  background-repeat: no-repeat;
+  background-position: center top;
+  background-size: cover;
+}
+
+
+.trip-info-btn,
+.trip-info-btn i {
+  color: #fff !important;
 }
 
 /* Claims buttons in Admin trips list */
@@ -352,21 +437,153 @@ footer a:hover {
 /* Leader trip cards hover */
 .leader-trip-card {
   border-radius: 14px;
-  background: linear-gradient(142deg, rgba(255,255,255,1) 50%, rgba(0,138,171,0.05) 100%);
-  border-right: 1.5px solid rgba(200,200,200,0.5) !important;
-  border-bottom: 1.5px solid rgba(200,200,200,0.5) !important;
-  border-left: 1.5px solid rgba(0,125,152,0.15) !important;
-  border-top: 1.5px solid rgba(0,125,152,0.15) !important;
+  background-image:
+    linear-gradient(145deg, rgba(255,255,255,0.98) 28%, rgba(255,255,255,0.86) 55%, rgba(0,138,171,0.08) 100%),
+    url("./assets/card-map.svg");
+  background-repeat: no-repeat;
+  background-position: left top;
+  background-size: cover;
+  border: 1.5px solid rgba(65,64,66,0.8) !important;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
   transform: translateZ(0);
   transition:
     transform 450ms ease-out,
     box-shadow 450ms ease-out,
-    background-color 450ms ease-out;
+    background-position 450ms ease-out,
+    background-size 450ms ease-out;
 }
 .leader-trip-card:hover {
   transform: scale(1.02);
   box-shadow: 0 10px 10px rgba(0, 0, 0, 0.07);
+  background-position: center;
+  background-size: 112%;
+}
+
+.trip-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--agf1);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+.trip-card-dates {
+  font-size: 0.95rem;
+}
+.trip-card-days {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+  white-space: nowrap;
+}
+.trip-card-inner {
+  position: relative;
+  padding: 18px 18px 12px 26px;
+}
+.trip-card-barcode {
+  position: absolute;
+  left: 0;
+  top: 64px;
+  transform: none;
+  height: 200px;
+  width: auto;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.trip-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  text-align: center;
+  padding-bottom: 8px;
+}
+.trip-card-stat-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: rgba(65,64,66,0.75);
+  letter-spacing: 0.6px;
+  font-weight: 600;
+}
+.trip-card-stat-value {
+  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--agf1);
+}
+.trip-card-destination {
+  text-align: left;
+  margin-top: 4px;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 420px;
+}
+.trip-card-destination-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--dark);
+  letter-spacing: 0;
+}
+.trip-card-destination-divider {
+  height: 2px;
+  width: 90%;
+  background: rgba(65,64,66,0.45);
+  margin: 4px 0 4px;
+}
+.trip-card-title {
+  text-transform: uppercase;
+  color: var(--agf1);
+  font-family: "avenir-next-world", "Helvetica Neue", sans-serif;
+  font-weight: 700;
+  font-size: 1.45rem;
+  text-align: left;
+  letter-spacing: -0.4px;
+}
+.trip-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px 12px 24px;
+  border-top: 1px solid rgba(65,64,66,0.2);
+}
+.trip-card-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--dark);
+}
+.trip-card-amount-label {
+  font-size: 0.85rem;
+}
+.trip-card-amount-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--melon);
+}
+.trip-card-amount-value.is-paid {
+  color: var(--agf1);
+}
+.trip-card-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.6px;
+  color: var(--dark);
+}
+.trip-card-id {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(65,64,66,0.75);
+  text-transform: none;
 }
 
 /* Match rounding between trip list and claims list rows */
@@ -463,6 +680,23 @@ footer a:hover {
   }
   .status-panel .status-label{
     text-align: left;
+  }
+  .leader-trip-card{
+    background-position: center;
+    background-size: cover;
+  }
+  .leader-trip-card:hover{
+    background-position: center;
+    background-size: 112%;
+  }
+  .trip-card-inner{
+    padding: 16px 14px 10px 22px;
+  }
+  .trip-card-barcode{
+    height: 160px;
+  }
+  .trip-card-title{
+    font-size: 1.05rem;
   }
 }
 .agf2{
@@ -646,4 +880,12 @@ footer a:hover {
     max-width: 100%;
     margin-top: 8px;
   }
+}
+.trip-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.trip-card-link:hover {
+  color: inherit;
 }

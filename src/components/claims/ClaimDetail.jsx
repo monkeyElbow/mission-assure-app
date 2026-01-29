@@ -42,7 +42,12 @@ export default function ClaimDetail({
       <div className="d-flex justify-content-between align-items-start">
         <div>
           <div className="fw-semibold">{claim.claimNumber}</div>
-          <div className="text-muted small">{claim.memberName || 'Traveler'} ({claim.memberEmail || '—'})</div>
+          <div className="text-muted small d-flex align-items-center gap-1 flex-wrap">
+            <span>{claim.memberName || 'Traveler'} ({claim.memberEmail || '—'})</span>
+            {claim.memberTripLeader && (
+              <span className="trip-leader-mark" title="Trip leader" aria-label="Trip leader">★</span>
+            )}
+          </div>
           <div className="text-muted small">Reporter: {claim.reporterName || '—'} ({claim.reporterEmail || '—'})</div>
         </div>
         <div className="d-flex align-items-center gap-2">

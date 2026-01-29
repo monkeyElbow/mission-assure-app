@@ -100,7 +100,7 @@ export default function TripMembersList({
           <span>Roster</span>
           <button
             type="button"
-            className="btn btn-sm btn-link text-white text-decoration-none p-0"
+            className="btn btn-sm btn-link text-white text-decoration-none p-0 trip-info-btn"
             onClick={() => setRosterTip(v => !v)}
             aria-label="Toggle roster overview tip"
           >
@@ -184,22 +184,22 @@ export default function TripMembersList({
             </div>
           ) : (
             <>
-              <div className={`border rounded-3 p-3 ${tourClass('readyRoster')}`} data-tour-step="readyRoster">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-semibold">Ready and Covered <span className="badge bg-agf1 text-white">{coveredCount}</span></div>
-                    <div className="small text-muted">Paid + confirmed travelers</div>
+              <div className={`trip-roster-section ${tourClass('readyRoster')}`} data-tour-step="readyRoster">
+                <div className="trip-roster-header trip-roster-header--ready">
+                  <div className="trip-roster-title">
+                    Ready and Covered <span className="trip-roster-count">{coveredCount}</span>
                   </div>
                   <button
                     type="button"
-                    className="btn btn-sm btn-link text-decoration-none p-0 text-muted"
+                    className="btn btn-sm btn-link trip-roster-header-btn"
                     onClick={() => setReadyTip(v => !v)}
                     aria-label="Toggle ready roster tip"
                   >
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 pt-2">
+                <div className="trip-roster-body">
+                  <div className="small text-muted">Paid + confirmed travelers</div>
                   {readyTip ? (
                     <TourCallout
                       title="Ready roster"
@@ -212,7 +212,7 @@ export default function TripMembersList({
                   ) : ready.length === 0 ? (
                     <div className="text-muted">{readyEmptyText}</div>
                   ) : (
-                    <div className="d-flex flex-column gap-2">
+                    <div className="d-flex flex-column gap-2 mt-2">
                       {ready.map((member, idx) => {
                         const key = member.member_id ?? member.id ?? idx;
                         return wrapCard('ready', renderReady(member), key);
@@ -243,27 +243,27 @@ export default function TripMembersList({
               )}
               </div>
 
-              <div className={`p-3 bg-light rounded-3 border ${tourDim}`}>
-                <div className="fw-semibold fs-6 text-danger mb-0">Below this point, these travelers are NOT covered.</div>
-                <div className="small text-muted">Apply credit to move them to Ready and Covered.</div>
+              <div className={`trip-roster-divider ${tourDim}`}>
+                <div className="fw-semibold fs-6 mb-0">Below this point, these travelers are NOT covered.</div>
+                <div className="small">Apply credit to move them to Ready and Covered.</div>
               </div>
 
-              <div className={`position-relative border rounded-3 p-3 ${tourClass('pendingCoverage')}`} data-tour-step="pendingCoverage">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-semibold agf2">Awaiting Payment <span className="badge bg-secondary">{awaitingPayment.length}</span></div>
-                    <div className="small text-muted">Confirmed/approved but awaiting credit payment</div>
+              <div className={`trip-roster-section ${tourClass('pendingCoverage')}`} data-tour-step="pendingCoverage">
+                <div className="trip-roster-header trip-roster-header--payment">
+                  <div className="trip-roster-title">
+                    Awaiting Payment <span className="trip-roster-count">{awaitingPayment.length}</span>
                   </div>
                   <button
                     type="button"
-                    className="btn btn-sm btn-link text-decoration-none p-0"
+                    className="btn btn-sm btn-link trip-roster-header-btn"
                     onClick={() => setPaymentTip(v => !v)}
                     aria-label="Toggle awaiting payment tip"
                   >
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 pt-2">
+                <div className="trip-roster-body">
+                  <div className="small text-muted">Confirmed/approved but awaiting credit payment</div>
                   {paymentTip ? (
                     <TourCallout
                       title="Awaiting payment"
@@ -276,7 +276,7 @@ export default function TripMembersList({
                   ) : awaitingPayment.length === 0 ? (
                     <div className="text-muted">{awaitingPaymentEmpty}</div>
                   ) : (
-                    <div className="d-flex flex-column gap-2">
+                    <div className="d-flex flex-column gap-2 mt-2">
                       {awaitingPayment.map((member, idx) => {
                         const key = member.member_id ?? member.id ?? idx;
                         return wrapCard('payment', renderPending(member), key);
@@ -297,22 +297,22 @@ export default function TripMembersList({
                 )}
               </div>
 
-              <div className={`position-relative border rounded-3 p-3 ${tourClass('awaitingConfirmation')}`} data-tour-step="awaitingConfirmation">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-semibold text-mango">Awaiting Confirmation <span className="badge bg-dark">{awaitingConfirmation.length}</span></div>
-                    <div className="small text-muted">Needs confirmation or guardian approval</div>
+              <div className={`trip-roster-section ${tourClass('awaitingConfirmation')}`} data-tour-step="awaitingConfirmation">
+                <div className="trip-roster-header trip-roster-header--confirm">
+                  <div className="trip-roster-title">
+                    Awaiting Confirmation <span className="trip-roster-count">{awaitingConfirmation.length}</span>
                   </div>
                   <button
                     type="button"
-                    className="btn btn-sm btn-link text-decoration-none p-0"
+                    className="btn btn-sm btn-link trip-roster-header-btn"
                     onClick={() => setConfirmTip(v => !v)}
                     aria-label="Toggle awaiting confirmation tip"
                   >
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-              <div className="mt-2 pt-2">
+              <div className="trip-roster-body">
+                <div className="small text-muted">Needs confirmation or guardian approval</div>
                 {confirmTip ? (
                   <TourCallout
                     title="Awaiting confirmation"
@@ -325,7 +325,7 @@ export default function TripMembersList({
                 ) : awaitingConfirmation.length === 0 ? (
                   <div className="text-muted">{awaitingConfirmEmpty}</div>
                 ) : (
-                  <div className="d-flex flex-column gap-2">
+                  <div className="d-flex flex-column gap-2 mt-2">
                     {awaitingConfirmation.map((member, idx) => {
                       const key = member.member_id ?? member.id ?? idx;
                       return wrapCard('confirm', renderPending(member), key);
@@ -346,26 +346,26 @@ export default function TripMembersList({
               )}
             </div>
 
-              <div className={`position-relative border rounded-3 p-3 ${tourClass('standbyRoster')}`} data-tour-step="standbyRoster">
-                <div className="d-flex justify-content-between align-items-center">
-                  <div>
-                    <div className="fw-semibold mb-0">Standby <span className="badge text-bg-secondary">{standby.length}</span></div>
-                    <div className="text-muted small">Inactive travelers; credit freed up</div>
+              <div className={`trip-roster-section ${tourClass('standbyRoster')}`} data-tour-step="standbyRoster">
+                <div className="trip-roster-header trip-roster-header--standby">
+                  <div className="trip-roster-title">
+                    Standby <span className="trip-roster-count">{standby.length}</span>
                   </div>
                   <button
                     type="button"
-                    className="btn btn-sm btn-link text-decoration-none p-0"
+                    className="btn btn-sm btn-link trip-roster-header-btn"
                     onClick={() => setStandbyTip(v => !v)}
                     aria-label="Toggle standby tip"
                   >
                     <i className="bi bi-question-circle" aria-hidden="true"></i>
                   </button>
                 </div>
-                <div className="mt-2 pt-2">
+                <div className="trip-roster-body">
+                  <div className="text-muted small">Inactive travelers; credit freed up</div>
                   {standby.length === 0 ? (
                     <div className="text-muted">No standby travelers.</div>
                   ) : (
-                    <div className="d-flex flex-column gap-2">
+                    <div className="d-flex flex-column gap-2 mt-2">
                       {standby.map((member, idx) => {
                         const key = member.member_id ?? member.id ?? idx;
                         return wrapCard('standby', renderStandby(member), key);
@@ -400,7 +400,7 @@ export default function TripMembersList({
           )}
 
           {bottomAddForm && (
-            <div className={`mt-3 pt-3 border-top ${tourClass('addPerson')}`} data-tour-step="addPerson">
+            <div className={`mt-3 pt-3 ${tourClass('addPerson')}`} data-tour-step="addPerson">
               {!bottomAddOpen ? (
                 <button
                   type="button"

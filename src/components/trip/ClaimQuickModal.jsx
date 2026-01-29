@@ -57,6 +57,7 @@ export default function ClaimQuickModal({ open, onClose, onSubmitted, trip, memb
       memberPhone: selected.phone || selected.phone_number || '',
       memberName: `${memberFirstName} ${memberLastName}`.trim() || selected.email || 'Traveler',
       memberEmail: selected.email || '',
+      memberTripLeader: !!(selected.tripLeader || selected.trip_leader || selected.is_trip_leader || selected.isTripLeader),
       reporterName: 'Leader',
       reporterEmail: '',
       role: 'LEADER',

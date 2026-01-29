@@ -151,6 +151,7 @@ function MemberRow({
       isMinor:            getFlag(m, 'is_minor','minor','isMinor','member.isMinor'),
       confirmed:          getFlag(m, 'confirmed','is_confirmed','member.confirmed'),
       guardianApproved:   getFlag(m, 'guardian_approved','guardianApproved','guardian.approved','member.guardianApproved'),
+      tripLeader:         getFlag(m, 'trip_leader', 'tripLeader', 'is_trip_leader', 'isTripLeader'),
   
       // try nested guardian, then flat legacy, then camelCase variants
       guardian_first_name: pick(g, 'first_name') || pick(m, 'guardian_first_name','guardianFirst','guardian_first'),
@@ -166,6 +167,7 @@ function MemberRow({
 const isMinorLocal = getFlag(member, 'is_minor','minor','isMinor','member.isMinor');
 const confirmedOk  = getFlag(member, 'confirmed','is_confirmed','member.confirmed');
 const guardianOk   = getFlag(member, 'guardian_approved','guardianApproved','member.guardianApproved');
+const isTripLeader = getFlag(member, 'trip_leader', 'tripLeader', 'is_trip_leader', 'isTripLeader');
 const [showGuardianDemo, setShowGuardianDemo] = useState(false);
 
 
@@ -215,6 +217,8 @@ function startEdit() {
         confirmed:           !draft.isMinor ? !!draft.confirmed : false,
         guardianApproved:     draft.isMinor ? !!draft.guardianApproved : false,
         guardian_approved:    draft.isMinor ? !!draft.guardianApproved : false,
+        tripLeader: !!draft.tripLeader,
+        trip_leader: !!draft.tripLeader,
         guardian
       };
   
@@ -370,7 +374,12 @@ function startEdit() {
         <div className="flex-grow-1">
           {!editing ? (
             <>
-              <div className="fw-semibold">{fullName}</div>
+              <div className="fw-semibold d-flex align-items-center gap-1">
+                <span>{fullName}</span>
+                {isTripLeader && (
+                  <span className="trip-leader-mark" title="Trip leader" aria-label="Trip leader">★</span>
+                )}
+              </div>
               <div className="d-flex flex-wrap gap-1 mt-1">
                 <span className="badge text-bg-light">{isMinorLocal ? 'Minor' : 'Adult'}</span>
                 <span
@@ -419,6 +428,12 @@ function startEdit() {
       checked={!!draft.isMinor}
       onChange={e => setDraft(d => ({...d, isMinor: e.target.checked}))}/>
     <span className="form-check-label ms-1">Minor</span>
+  </label>
+  <label className="form-check">
+    <input className="form-check-input" type="checkbox"
+      checked={!!draft.tripLeader}
+      onChange={e => setDraft(d => ({...d, tripLeader: e.target.checked}))}/>
+    <span className="form-check-label ms-1">Trip leader</span>
   </label>
 
   {!draft.isMinor ? (
@@ -583,6 +598,10 @@ function daysBetween(a,b){
 export default function TripDetail(){
   const { id } = useParams()
   const nav = useNavigate()
+  useEffect(() => {
+    document.body.classList.add('trip-detail-bg');
+    return () => document.body.classList.remove('trip-detail-bg');
+  }, []);
 
 const [claimMembers, setClaimMembers] = useState([]);
 const [confirmModalMember, setConfirmModalMember] = useState(null);
@@ -602,7 +621,8 @@ function openEdit(member) {
     phone:      member.phone || "",
     confirmed:  asBool(member.confirmed),
     guardianApproved: asBool(member.guardian_approved ?? member.guardianApproved),
-    active: (member.active !== false)
+    active: (member.active !== false),
+    tripLeader: asBool(member.trip_leader ?? member.tripLeader ?? member.is_trip_leader ?? member.isTripLeader)
   });
   setShowEdit(true);
 }
@@ -806,7 +826,8 @@ async function openClaim() {
       id: m.member_id ?? m.id,
       firstName: m.first_name ?? m.firstName ?? '',
       lastName: m.last_name ?? m.lastName ?? '',
-      email: m.email || ''
+      email: m.email || '',
+      tripLeader: getFlag(m, 'trip_leader', 'tripLeader', 'is_trip_leader', 'isTripLeader')
     }));
     setClaimMembers(normalized);
     setShowClaim(true);
@@ -1417,8 +1438,16 @@ async function handleMoveToStandby(memberSummary) {
 }
 
 
-  if (loading) return <div className="container py-4">Loading trip…</div>
-  if (!trip) return <div className="container py-4">Trip not found.</div>
+  if (loading) return (
+    <div className="trip-detail-page">
+      <div className="container py-4">Loading trip…</div>
+    </div>
+  );
+  if (!trip) return (
+    <div className="trip-detail-page">
+      <div className="container py-4">Trip not found.</div>
+    </div>
+  );
 
     
 
@@ -1448,6 +1477,7 @@ function onEditMember(memberId) {
   const tripCode = trip?.shortId || trip?.id;
 
   return (
+    <div className="trip-detail-page">
     <div className="container py-4">
       <div className="row g-3 mb-4 align-items-stretch">
         <div className="col-12 col-md-6 d-flex">
@@ -1595,7 +1625,7 @@ function onEditMember(memberId) {
                 <span>Payment summary</span>
                 <button
                   type="button"
-                  className="btn btn-sm btn-link text-white text-decoration-none p-0"
+                  className="btn btn-sm btn-link text-white text-decoration-none p-0 trip-info-btn"
                   onClick={() => setPaymentTip(t => !t)}
                   aria-label="Toggle payment summary tip"
                 >
@@ -1724,7 +1754,7 @@ function onEditMember(memberId) {
                 <span>Claims</span>
                 <button
                   type="button"
-                  className="btn btn-sm btn-link text-white text-decoration-none p-0"
+                  className="btn btn-sm btn-link text-white text-decoration-none p-0 trip-info-btn"
                   onClick={() => setClaimsTip(t => !t)}
                   aria-label="Toggle claims tip"
                 >
@@ -1836,7 +1866,7 @@ function onEditMember(memberId) {
               <span>Refunds</span>
               <button
                 type="button"
-                className="btn btn-sm btn-link text-white text-decoration-none p-0"
+                className="btn btn-sm btn-link text-white text-decoration-none p-0 trip-info-btn"
                 onClick={() => setRefundTip(t => !t)}
                 aria-label="Toggle refunds tip"
               >
@@ -1999,6 +2029,7 @@ function onEditMember(memberId) {
         />
 
       </div>
+    </div>
     </div>
   )
 }

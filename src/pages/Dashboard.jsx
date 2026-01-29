@@ -6,9 +6,10 @@ import { daysInclusive } from '../core/pricing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fadeSlide } from '../ui/motion';
 import DashSearch from '../components/DashSearch';
-import { Container, Card, Row, Col } from 'react-bootstrap';
+import { Container, Card } from 'react-bootstrap';
 import AppLogoIntro from '../ui/AppLogoIntro';
 import TourCallout from '../components/tour/TourCallout.jsx';
+import playBarcode from '../assets/play-bar-code.svg';
 
 const motionRef = motion; void motionRef; // satisfy lint without react JSX plugin
 
@@ -59,10 +60,8 @@ function TripCard({ t, meta = {} }) {
   const {
     memberCount = 0,
     confirmedCount = 0,
-    unconfirmedCount = 0,
-    pendingCount = 0,
+    readyCount = 0,
     balanceDueCents = 0,
-    status = 'SETUP',
   } = meta;
 
   const days = daysInclusive(t.startDate, t.endDate) || 0;
@@ -70,72 +69,50 @@ function TripCard({ t, meta = {} }) {
 
   return (
     <motion.div className="h-100" layout>
-      <Card className={`leader-trip-card p-4 h-100 position-relative ${isArchived ? 'archived-card' : ''}`}>
-        <h2 className="h4 mb-2">{t.title}</h2>
-        <Row className="g-2 align-items-start">
-          <Col md={12} className="d-flex flex-column gap-2">
-            <div className="d-flex flex-wrap align-items-center gap-2">
-              {t.shortId && <span className="fw-semibold text-muted small">#{t.shortId}</span>}
-              <span className="badge bg-dark small">{t.region}</span>
+      <Link to={`/trips/${t.id}`} className="trip-card-link" aria-label={`Open ${t.title}`}>
+        <Card className={`leader-trip-card h-100 position-relative ${isArchived ? 'archived-card' : ''}`}>
+          <img className="trip-card-barcode" src={playBarcode} alt="" aria-hidden="true" />
+          <div className="trip-card-header">
+            <div className="trip-card-dates">{t.startDate} → {t.endDate}</div>
+            <div className="trip-card-days">{days} days</div>
+          </div>
+          <div className="trip-card-inner">
+            <div className="trip-card-stats">
+              <div className="trip-card-stat">
+                <div className="trip-card-stat-label">Travelers</div>
+                <div className="trip-card-stat-value">{memberCount}</div>
+              </div>
+              <div className="trip-card-stat">
+                <div className="trip-card-stat-label">Confirmed</div>
+                <div className="trip-card-stat-value">{confirmedCount}</div>
+              </div>
+              <div className="trip-card-stat">
+                <div className="trip-card-stat-label">Ready</div>
+                <div className="trip-card-stat-value">{readyCount}</div>
+              </div>
             </div>
-            <div className="small text-muted lh-sm d-flex align-items-center gap-2 flex-wrap">
-              <span>{t.startDate} → {t.endDate}</span>
-              <span className="badge bg-light text-dark border">{days} days</span>
+            <div className="trip-card-destination">
+              <div className="trip-card-destination-label">Destination</div>
+              <div className="trip-card-destination-divider" />
+              <div className="trip-card-title">{t.title}</div>
             </div>
-            <div className="d-flex flex-wrap align-items-center gap-2 small text-muted lh-sm">
+          </div>
+          <div className="trip-card-footer">
+            <div className="trip-card-amount">
+              <span className="trip-card-amount-label">Amount due:</span>
               <span
-                className="badge bg-light fw-semibold"
-                style={{ color: 'var(--agf1)', border: '1px solid var(--agf1)' }}
+                className={`trip-card-amount-value ${balanceDueCents <= 0 ? 'is-paid' : ''}`}
               >
-                {confirmedCount}/{memberCount} confirmed
+                {balanceDueCents <= 0 ? 'PAID' : cents(balanceDueCents)}
               </span>
-              {!isArchived && (
-                <>
-                  <span className="badge bg-agf1 text-white">Ready: {confirmedCount}</span>
-                  {pendingCount > 0 && (
-                    <span className="badge bg-warning text-dark">Pending: {pendingCount}</span>
-                  )}
-                </>
-              )}
-              {!isArchived && status === 'DUE' && (
-                <motion.span
-                  key="due"
-                  className="badge bg-melon text-dark"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  Pay {cents(balanceDueCents)}
-                </motion.span>
-              )}
-              <AnimatePresence>
-                {!isArchived && unconfirmedCount > 0 && (
-                  <motion.span
-                    key={`unconf-${unconfirmedCount}`}
-                    className="badge bg-melon"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.18 }}
-                  >
-                    {unconfirmedCount} unconfirmed
-                  </motion.span>
-                )}
-              </AnimatePresence>
-              {isArchived && <span className="badge text-bg-secondary">ARCHIVED</span>}
-              {!isArchived && memberCount === 0 && (
-                <span className="badge text-bg-light text-muted">Ready to add people</span>
-              )}
             </div>
-            <div className="pt-3 mt-2 border-top text-center">
-              <Link to={`/trips/${t.id}`} className="btn btn-sm btn-primary px-4 stretched-link">
-                Open
-              </Link>
+            <div className="trip-card-meta">
+              <span className="trip-card-region">{(t.region || 'Domestic').toUpperCase()}</span>
+              {t.shortId && <span className="trip-card-id">#{t.shortId}</span>}
             </div>
-          </Col>
-        </Row>
-      </Card>
+          </div>
+        </Card>
+      </Link>
     </motion.div>
   );
 }
@@ -158,7 +135,9 @@ export default function Dashboard() {
         ts.map(async (t) => {
           const full = await api.getTrip(t.id); // ensure we have members/credits
           const trip = full?.trip ? { ...full.trip, members: full.members || [] } : full || t;
-          meta[t.id] = buildMeta(trip);
+          const summary = await api.getRosterSummary?.(t.id).catch(() => null);
+          const readyCount = summary?.ready_roster?.length || 0;
+          meta[t.id] = { ...buildMeta(trip), readyCount };
         })
       );
       setMetaByTrip(meta);
@@ -269,7 +248,7 @@ const handleIntroDone = useCallback(() => setIntroDone(true), []);
               <motion.div key={t.id} 
               {...fadeSlide} 
               transition={{ ...(fadeSlide.transition || {}), delay: i * 0.18 }} 
-              className="col-md-6">
+              className="col-lg-6">
 
                 <TripCard t={t} meta={metaByTrip[t.id]} />
 

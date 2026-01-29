@@ -18,6 +18,7 @@ export default function TripMemberAddForm({ tripId, onAdded, compact = false, on
     email: '',
     phone: '',
     isMinor: false,
+    tripLeader: false,
     guardianFirstName: '',
     guardianLastName: '',
     guardianEmail: '',
@@ -30,6 +31,8 @@ export default function TripMemberAddForm({ tripId, onAdded, compact = false, on
     return (e) => {
       const val =
         field === 'isMinor'
+          ? e.target.checked
+          : field === 'tripLeader'
           ? e.target.checked
           : (field === 'phone' || field === 'guardianPhone')
           ? formatPhone(e.target.value)
@@ -69,6 +72,8 @@ export default function TripMemberAddForm({ tripId, onAdded, compact = false, on
       phone: draft.phone.trim(),
       isMinor: draft.isMinor,
       is_minor: draft.isMinor,
+      tripLeader: draft.tripLeader,
+      trip_leader: draft.tripLeader,
       guardianFirst: guardianFirst,
       guardianLast: guardianLast,
       guardian_first_name: guardianFirst,
@@ -99,6 +104,7 @@ export default function TripMemberAddForm({ tripId, onAdded, compact = false, on
         email: '',
         phone: '',
         isMinor: false,
+        tripLeader: false,
         guardianFirstName: '',
         guardianLastName: '',
         guardianEmail: '',
@@ -159,22 +165,36 @@ export default function TripMemberAddForm({ tripId, onAdded, compact = false, on
           </div>
         </div>
 
-        {/* Minor toggle */}
+        {/* Minor + Trip Leader toggles */}
         <div className="row g-2 mt-3 mb-1 align-items-center">
           <div className="col">
-            <div className="form-check form-switch ms-1">
-              <input
-                className="form-check-input"
-                type="checkbox"
-                id="member-isMinor"
-                checked={draft.isMinor}
-                onChange={update('isMinor')}
-                aria-expanded={draft.isMinor}
-                aria-controls="minor-fields"
-              />
-              <label className="form-check-label" htmlFor="member-isMinor">
-                Minor (17 or younger)
-              </label>
+            <div className="d-flex flex-wrap align-items-center gap-3 ms-1">
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="member-isMinor"
+                  checked={draft.isMinor}
+                  onChange={update('isMinor')}
+                  aria-expanded={draft.isMinor}
+                  aria-controls="minor-fields"
+                />
+                <label className="form-check-label" htmlFor="member-isMinor">
+                  Minor (17 or younger)
+                </label>
+              </div>
+              <div className="form-check">
+                <input
+                  className="form-check-input"
+                  type="checkbox"
+                  id="member-tripLeader"
+                  checked={draft.tripLeader}
+                  onChange={update('tripLeader')}
+                />
+                <label className="form-check-label" htmlFor="member-tripLeader">
+                  Trip leader
+                </label>
+              </div>
             </div>
           </div>
           {buttonArea}
@@ -199,6 +219,7 @@ export default function TripMemberAddForm({ tripId, onAdded, compact = false, on
               email: '',
               phone: '',
               isMinor: false,
+              tripLeader: false,
               guardianFirstName: '',
               guardianLastName: '',
               guardianEmail: '',
